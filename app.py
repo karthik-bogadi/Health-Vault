@@ -349,7 +349,7 @@ def create_app():
         expiry_time = (datetime.now() + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
 
         # Build a QR code that points to the doctor page with this key
-        qr_url = qr_url = f"http://192.168.14.138:5000/doctor?key={access_key}"
+        qr_url = url_for("doctor", key=access_key, _external=True)
 
         img = qrcode.make(qr_url)
         buffer = BytesIO()
