@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="home-wrapper">
+
+  <!-- ── Hero Card ─────────────────────────────────────────── -->
+  <div class="hero-card">
+    <div class="hero-eyebrow">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      Secure · Private · Patient-Controlled
+    </div>
+
+    <h1>Your Medical Records,<br><span>In Your Hands</span></h1>
+
+    <p class="hero-description">
+      HealthVault lets you securely store medical reports and share them with doctors using time-limited access keys — no data leaves without your permission.
+    </p>
+
+    <div class="hero-actions">
+      <a class="btn btn-hero-primary" href="{{ url_for('register') }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+        </svg>
+        Create Patient Account
+      </a>
+      <a class="btn btn-hero-secondary" href="{{ url_for('login') }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+        </svg>
+        Patient Login
+      </a>
+    </div>
+  </div>
+
+  <!-- ── Feature Cards ──────────────────────────────────────── -->
+  <div class="feature-grid">
+
+    <div class="feature-card">
+      <div class="feature-icon fi-blue">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <h3>Upload Reports</h3>
+      <p>Store PDFs, X-rays, and medical images securely in your personal health vault.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon fi-cyan">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <h3>Temporary Access Keys</h3>
+      <p>Generate time-limited keys to share only selected reports — access expires automatically.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon fi-green">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.7a16 16 0 0 0 6 6l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16z"/>
+        </svg>
+      </div>
+      <h3>Doctor Access Portal</h3>
+      <p>Doctors enter the key to instantly view shared reports and run AI-powered summaries.</p>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

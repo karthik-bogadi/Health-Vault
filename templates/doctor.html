@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="doctor-wrapper">
+
+  <!-- ── Hero Banner ────────────────────────────────────────── -->
+  <div class="doctor-hero">
+    <div class="doctor-hero-badge">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      Secure Doctor Access Portal
+    </div>
+    <h2>Patient Report Viewer</h2>
+    <p>Enter the patient-issued access key to view their shared medical reports.<br>Access is read-only and time-limited.</p>
+  </div>
+
+  <!-- ── Access Form Card ───────────────────────────────────── -->
+  <div class="access-form-card">
+    <div class="section-label" style="margin-bottom:0.5rem">Access Key</div>
+    <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+      The patient should provide you with a key from their HealthVault dashboard.
+    </p>
+
+    <form method="POST" action="{{ url_for('doctor') }}" id="doctor-form">
+      <div class="access-key-input-wrap">
+        <input
+          id="access_key"
+          name="access_key"
+          type="text"
+          placeholder="e.g. HV-A1B2-C3D4-E5F6"
+          required
+          autocomplete="off"
+          spellcheck="false"
+          style="font-family:'DM Mono',monospace;letter-spacing:0.07em"
+          value="{{ access_key or '' }}"
+        >
+        <button type="submit">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          View Reports
+        </button>
+      </div>
+    </form>
+
+    <!-- Active key confirmation -->
+    {% if access_key %}
+      <div class="access-status access-status-active" style="margin-top:1rem">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        Access granted for key: <span class="key" style="margin-left:4px">{{ access_key }}</span>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- ── Countdown Timer ──────────────────────────────────────
+       Only rendered when a valid key + expiry_time exist.
+       JS reads data-expiry, does all the math client-side.
+  ──────────────────────────────────────────────────────────── -->
+  {% if access_key and expiry_time %}
+    <div
+      id="countdown-banner"
+      class="countdown-banner countdown-active"
+      data-expiry="{{ expiry_time }}"
+      role="status"
+      aria-live="polite"
+    >
+      <!-- Left: clock icon + label -->
+      <div class="countdown-left">
+        <div class="countdown-icon-wrap">
+          <svg id="countdown-clock-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <!-- Warning icon — hidden until < 2 min -->
+          <svg id="countdown-warn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+               style="display:none">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
+        <div>
+          <div class="countdown-label" id="countdown-label">Key expires in</div>
+          <div class="countdown-sublabel" id="countdown-sublabel">Access is temporary and read-only</div>
+        </div>
+      </div>
+
+      <!-- Right: MM:SS display -->
+      <div class="countdown-right">
+        <div class="countdown-digits" id="countdown-digits">
+          <span class="countdown-mm" id="countdown-mm">--</span>
+          <span class="countdown-colon">:</span>
+          <span class="countdown-ss" id="countdown-ss">--</span>
+        </div>
+        <div class="countdown-progress-track">
+          <div class="countdown-progress-bar" id="countdown-progress-bar"></div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- ── Reports Section ────────────────────────────────────── -->
+  {% if reports is not none %}
+    <div class="doctor-reports-card" id="reports-card">
+
+      <!-- Expired overlay — hidden by default, shown by JS on expiry -->
+      <div class="expired-overlay" id="expired-overlay" style="display:none">
+        <div class="expired-overlay-inner">
+          <div class="expired-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+            </svg>
+          </div>
+          <p class="expired-title">Access key expired</p>
+          <p class="expired-sub">Ask the patient to generate a new key to continue viewing reports.</p>
+        </div>
+      </div>
+      <div class="reports-header">
+        <h3>
+          Patient Reports
+          {% if reports|length > 0 %}
+            <span class="badge badge-green" style="margin-left:6px">{{ reports|length }} file{{ 's' if reports|length != 1 else '' }}</span>
+          {% endif %}
+        </h3>
+        <span class="badge badge-amber">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Temporary Access
+        </span>
+      </div>
+
+      {% if reports|length > 0 %}
+        <ul class="report-list">
+          {% for r in reports %}
+            <li class="doctor-report-item">
+
+              <!-- File icon -->
+              <div class="report-icon" data-filename="{{ r['original_filename'] or r['file_name'] }}"></div>
+
+              <!-- Info -->
+              <div class="report-info">
+                <div class="report-name">{{ r["original_filename"] or r["file_name"] }}</div>
+                <div class="report-date">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  {{ r["upload_date"] }}
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div class="doctor-report-actions">
+                <a class="btn btn-ghost btn-sm" href="{{ url_for('uploaded_file', filename=r['file_name']) }}" target="_blank">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  View
+                </a>
+
+                {# AI Summary — only for PDFs #}
+                {% if r["file_name"].lower().endswith(".pdf") %}
+                  <button
+                    type="button"
+                    class="ai-summary-btn"
+                    data-report-id="{{ r['id'] }}"
+                  >
+                    <!-- icon injected by JS -->
+                    AI Summary
+                  </button>
+                  <span class="ai-summary-status" id="ai-status-{{ r['id'] }}"></span>
+                {% endif %}
+              </div>
+
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+          </div>
+          <h3>No reports shared</h3>
+          <p>The patient hasn't shared any reports with this access key.</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- ── AI Summary Section ──────────────────────────────── -->
+    <div class="ai-summary-section" {% if not reports or reports|length == 0 %}style="display:none"{% endif %}>
+      <h3>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style="color:#7c3aed">
+          <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+        </svg>
+        AI-Generated Summaries
+        <span class="ai-badge">Powered by AI</span>
+      </h3>
+      <div id="aiSummaryContainer"></div>
+    </div>
+
+  {% endif %}
+
+  <!-- ── Info Note ──────────────────────────────────────────── -->
+  {% if not access_key %}
+    <div style="margin-top:1.25rem;padding:1rem 1.25rem;background:white;border:1px solid var(--border);border-radius:var(--radius-lg);display:flex;align-items:flex-start;gap:0.75rem">
+      <div style="width:34px;height:34px;background:var(--blue-50);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--blue-600)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+      </div>
+      <div>
+        <p style="font-weight:600;font-size:0.875rem;color:var(--text-primary);margin:0 0 0.2rem">How to access patient records</p>
+        <p style="font-size:0.8rem;margin:0;line-height:1.6">Ask the patient to open HealthVault, select the reports they want to share, and generate an access key. Enter that key above to view their records securely.</p>
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

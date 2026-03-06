@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-wrapper" style="max-width:540px">
+  <div class="auth-card">
+
+    <!-- Header -->
+    <div class="auth-header">
+      <div class="auth-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <line x1="19" y1="8" x2="19" y2="14"/>
+          <line x1="22" y1="11" x2="16" y2="11"/>
+        </svg>
+      </div>
+      <h2>Create Your Account</h2>
+      <p>Set up your secure patient health vault</p>
+    </div>
+
+    <!-- Form -->
+    <form method="POST" action="{{ url_for('register') }}">
+
+      <!-- Account info -->
+      <div class="section-label" style="margin-top:0">Account Information</div>
+
+      <div class="form-group">
+        <label for="name">Full Name</label>
+        <input id="name" name="name" type="text" placeholder="Dr. Jane Smith" required autocomplete="name">
+      </div>
+
+      <div class="form-group-row" style="margin-top:0.85rem">
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" placeholder="you@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" placeholder="Min 8 characters" required autocomplete="new-password">
+        </div>
+      </div>
+
+      <!-- Medical info -->
+      <div class="section-label" style="margin-top:1.5rem">Medical Information <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-muted);font-size:0.75rem">(optional)</span></div>
+
+      <div class="form-group">
+        <label for="blood_group">Blood Group</label>
+        <input id="blood_group" name="blood_group" type="text" placeholder="e.g. O+, AB-">
+      </div>
+
+      <div class="form-group" style="margin-top:0.85rem">
+        <label for="allergies">Known Allergies</label>
+        <textarea id="allergies" name="allergies" rows="2" placeholder="e.g. Penicillin, Peanuts, Latex"></textarea>
+      </div>
+
+      <div class="form-group" style="margin-top:0.85rem">
+        <label for="chronic_disease">Chronic Conditions</label>
+        <textarea id="chronic_disease" name="chronic_disease" rows="2" placeholder="e.g. Type 2 Diabetes, Hypertension"></textarea>
+      </div>
+
+      <div style="margin-top:1.5rem">
+        <button type="submit">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          Create Account
+        </button>
+      </div>
+    </form>
+
+    <div class="form-divider">already have an account?</div>
+    <div class="auth-footer">
+      <a class="link" href="{{ url_for('login') }}">&larr; Sign In</a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

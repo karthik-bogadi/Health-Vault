@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-wrapper">
+
+  <!-- ── Dashboard Header ────────────────────────────────── -->
+  <div class="dashboard-header">
+    <div class="dash-welcome">
+      <h2>
+        Good day, {{ patient["name"].split()[0] }}
+        <span style="font-size:1.4rem">👋</span>
+      </h2>
+      <p>Manage your medical records and control who can access them.</p>
+    </div>
+    <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm" style="width:auto;white-space:nowrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      Logout
+    </a>
+  </div>
+
+  <!-- ── Emergency Info Banner ───────────────────────────── -->
+  <div class="emergency-card" style="margin-bottom:1.25rem">
+    <div class="emergency-stat">
+      <div class="emergency-stat-label">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        Blood Group
+      </div>
+      <div class="emergency-stat-value">
+        {% if patient["blood_group"] %}
+          <span class="blood-badge">{{ patient["blood_group"] }}</span>
+        {% else %}
+          <span class="muted" style="font-size:0.85rem">Not set</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="emergency-stat">
+      <div class="emergency-stat-label">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Allergies
+      </div>
+      <div class="emergency-stat-value" style="font-size:0.85rem">
+        {{ patient["allergies"] or "None recorded" }}
+      </div>
+    </div>
+    <div class="emergency-stat">
+      <div class="emergency-stat-label">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        Chronic Conditions
+      </div>
+      <div class="emergency-stat-value" style="font-size:0.85rem">
+        {{ patient["chronic_disease"] or "None recorded" }}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Two-column grid ─────────────────────────────────── -->
+  <div class="dashboard-grid">
+
+    <!-- LEFT COLUMN -->
+    <div class="dashboard-left">
+
+      <!-- Upload Card -->
+      <form method="POST" action="{{ url_for('dashboard') }}" enctype="multipart/form-data" id="upload-form">
+        <div class="upload-card">
+          <div class="upload-icon-wrap">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+            </svg>
+          </div>
+          <h3>Upload Medical Report</h3>
+          <p>PDF, JPG, or PNG · Max 10 MB per file</p>
+
+          <div class="file-input-wrapper">
+            <span class="file-chosen" id="file-chosen-label">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Choose file to upload
+            </span>
+            <input id="report_file" name="report_file" type="file" accept=".pdf,.png,.jpg,.jpeg" required>
+          </div>
+
+          <button type="submit" style="margin-top:0.75rem">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+            </svg>
+            Upload Report
+          </button>
+        </div>
+      </form>
+
+      <!-- Reports List -->
+      <form method="POST" action="{{ url_for('generate_key') }}" id="generate-key-form">
+        <div class="reports-card">
+          <div class="reports-header">
+            <h3>
+              Your Reports
+              {% if reports %}
+                <span class="badge badge-blue" style="margin-left:6px">{{ reports|length }}</span>
+              {% endif %}
+            </h3>
+            {% if reports and reports|length > 0 %}
+              <label class="select-all-wrap">
+                <input type="checkbox" id="select_all_reports" style="margin:0">
+                Select all
+              </label>
+            {% endif %}
+          </div>
+
+          {% if reports and reports|length > 0 %}
+            <ul class="report-list">
+              {% for r in reports %}
+                <li class="report-item">
+                  <!-- Checkbox -->
+                  <input
+                    type="checkbox"
+                    name="selected_reports"
+                    value="{{ r['id'] }}"
+                    class="report-checkbox"
+                    style="width:16px;height:16px;flex-shrink:0;margin:0"
+                  >
+
+                  <!-- File type icon -->
+                  <div class="report-icon" data-filename="{{ r['original_filename'] or r['file_name'] }}"></div>
+
+                  <!-- Info -->
+                  <div class="report-info">
+                    <div class="report-name">{{ r["original_filename"] or r["file_name"] }}</div>
+                    <div class="report-date">
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      {{ r["upload_date"] }}
+                    </div>
+                  </div>
+
+                  <!-- Actions -->
+                  <div class="report-actions">
+                    <a class="btn btn-ghost btn-sm" href="{{ url_for('uploaded_file', filename=r['file_name']) }}" target="_blank">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                        <circle cx="12" cy="12" r="3"/>
+                      </svg>
+                      View
+                    </a>
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="empty-state">
+              <div class="empty-icon">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="12" y1="18" x2="12" y2="12"/>
+                  <line x1="9" y1="15" x2="15" y2="15"/>
+                </svg>
+              </div>
+              <h3>No reports yet</h3>
+              <p>Upload your first medical report using the panel above.</p>
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Generate Key button (part of same form) -->
+        {% if reports and reports|length > 0 %}
+          <div style="margin-top:0.75rem">
+            <button type="submit" class="btn btn-outline" style="background:white">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+              </svg>
+              Generate Access Key for Selected Reports
+            </button>
+          </div>
+        {% endif %}
+
+      </form>
+    </div>
+
+    <!-- RIGHT COLUMN — Access Key -->
+    <div class="dashboard-right">
+      <div class="key-card">
+        <div class="section-label">Access Key</div>
+        <h3>Share with Doctor</h3>
+        <p style="font-size:0.82rem;margin-top:0.25rem;margin-bottom:1rem">
+          Select reports on the left, then generate a key. Share it with your doctor for temporary, secure access.
+        </p>
+
+        {% if latest_key %}
+          <div class="key-display">
+            <div class="key-display-label">Active Access Key</div>
+            <div class="key-display-value" id="key-display-value">{{ latest_key["access_key"] }}</div>
+            <div class="key-expiry">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              Expires: {{ latest_key["expiry_time"] }}
+            </div>
+            <button class="copy-btn" id="copy-key-btn" type="button">Copy</button>
+          </div>
+
+          {% if qr_code_image %}
+            <div class="qr-section">
+              <p>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+                Scan to share with doctor
+              </p>
+              <img src="data:image/png;base64,{{ qr_code_image }}" alt="QR Code" width="140">
+            </div>
+          {% endif %}
+
+          <div style="margin-top:1rem;padding:0.75rem;background:var(--blue-50);border-radius:8px;border:1px solid var(--blue-100)">
+            <p style="font-size:0.78rem;color:var(--blue-700);margin:0;display:flex;align-items:flex-start;gap:6px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              This key grants read-only access to selected reports and expires automatically.
+            </p>
+          </div>
+        {% else %}
+          <div style="padding:2rem 1rem;text-align:center;background:var(--surface);border-radius:var(--radius-md);border:1px dashed var(--border-2)">
+            <div style="width:44px;height:44px;background:white;border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;border:1px solid var(--border);color:var(--text-muted)">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>
+              </svg>
+            </div>
+            <p class="muted" style="font-size:0.82rem;margin:0">No active access key.<br>Select reports and generate one.</p>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- How it works card -->
+      <div style="background:white;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem">
+        <div class="section-label" style="margin-bottom:0.85rem">How It Works</div>
+        <div style="display:flex;flex-direction:column;gap:0.85rem">
+          <div style="display:flex;gap:0.75rem;align-items:flex-start">
+            <div style="width:24px;height:24px;background:var(--blue-600);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;font-family:Outfit,sans-serif;flex-shrink:0">1</div>
+            <div>
+              <p style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin:0">Select Reports</p>
+              <p style="font-size:0.78rem;margin:0">Check the reports you want to share</p>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.75rem;align-items:flex-start">
+            <div style="width:24px;height:24px;background:var(--blue-600);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;font-family:Outfit,sans-serif;flex-shrink:0">2</div>
+            <div>
+              <p style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin:0">Generate Key</p>
+              <p style="font-size:0.78rem;margin:0">A unique time-limited access key is created</p>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.75rem;align-items:flex-start">
+            <div style="width:24px;height:24px;background:var(--blue-600);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;font-family:Outfit,sans-serif;flex-shrink:0">3</div>
+            <div>
+              <p style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin:0">Share with Doctor</p>
+              <p style="font-size:0.78rem;margin:0">Doctor enters the key on the Doctor Portal</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
