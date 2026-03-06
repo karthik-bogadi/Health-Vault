@@ -13,6 +13,7 @@ import base64
 from io import BytesIO
 import qrcode
 from dotenv import load_dotenv
+from zoneinfo import ZoneInfo
 
 load_dotenv()
 # AI REPORT SUMMARY FEATURE
@@ -346,7 +347,7 @@ def create_app():
 
         # UUID-based random key (short and easy to share)
         access_key = uuid.uuid4().hex[:12].upper()
-        expiry_time = (datetime.now() + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
+        expiry_time = (datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
 
         # Build a QR code that points to the doctor page with this key
         qr_url = url_for("doctor", key=access_key, _external=True)
