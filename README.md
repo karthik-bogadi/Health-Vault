@@ -1,33 +1,49 @@
-### 🏥 Health Vault
+# 🏥 Health Vault
 
-## 🔗 Live Demo:
+## 🔗 Live Demo
 https://health-vault-ylmr.onrender.com/
 
-## 📌 Overview
+---
 
-Health Vault is a secure web application that allows patients to store, manage, and share medical reports safely with controlled access.
+## 📌 Overview
+Health Vault is a secure web application that allows patients to **store, manage, and share medical reports safely** with controlled access.
+
+---
 
 ## 🚀 Features
-# 👤 Patients
-Register & login
-Upload and manage medical reports
-Generate temporary access keys
-🎯 Selective report sharing (choose specific reports)
-📷 QR-based report access sharing
-## 🩺 Doctors
-View patient reports using access keys or QR codes
-🤖 AI Features
-AI-generated medical report summaries using LLM
+
+### 👤 Patients
+- Register & login  
+- Upload and manage medical reports  
+- Generate temporary access keys  
+- 🎯 Selective report sharing (choose specific reports)  
+- 📷 QR-based report access sharing  
+
+### 🩺 Doctors
+- View patient reports using access keys or QR codes  
+
+### 🤖 AI Features
+- AI-generated medical report summaries (LLM-based)  
+
+---
+
 ## 🔒 Security
-Temporary and controlled access
-Privacy-focused data sharing
-Secure storage using SQLite
+- Temporary and controlled access  
+- Privacy-focused data sharing  
+- Secure storage using SQLite  
+
+---
+
 ## 🛠️ Tech Stack
-Backend: Flask (Python)
-Database: SQLite
-Frontend: HTML, CSS
-## Deployment: Render
-⚙️ Run Locally
+- **Backend:** Flask (Python)  
+- **Database:** SQLite  
+- **Frontend:** HTML, CSS  
+- **Deployment:** Render  
+
+---
+
+## ⚙️ Run Locally
+
 pip install -r requirements.txt
 python app.py
 
