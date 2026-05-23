@@ -5,6 +5,7 @@ to read and understand for beginners.
 """
 
 import os
+import re
 import sqlite3
 import uuid
 from datetime import datetime, timedelta
@@ -13,12 +14,14 @@ import base64
 from io import BytesIO
 import qrcode
 from dotenv import load_dotenv
-from zoneinfo import ZoneInfo
 
 load_dotenv()
 # AI REPORT SUMMARY FEATURE
 from groq import Groq
 from PyPDF2 import PdfReader
+
+# AI SECURITY & OCR FEATURE
+REDACTED = "[REDACTED]"
 
 from flask import Flask, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 from werkzeug.utils import secure_filename
@@ -31,9 +34,97 @@ from werkzeug.utils import secure_filename
 DATABASE_NAME = "health_vault.db"
 ALLOWED_EXTENSIONS = {"pdf", "jpg", "jpeg", "png"}
 
+# REPORT CATEGORIZATION FEATURE
+REPORT_CATEGORIES = [
+    {"key": "Heart", "emoji": "❤️", "label": "Heart", "color_slug": "heart"},
+    {"key": "Lungs", "emoji": "🫁", "label": "Lungs", "color_slug": "lungs"},
+    {"key": "Kidney", "emoji": "🫘", "label": "Kidney", "color_slug": "kidney"},
+    {"key": "Brain", "emoji": "🧠", "label": "Brain", "color_slug": "brain"},
+    {"key": "Liver", "emoji": "🫀", "label": "Liver", "color_slug": "liver"},
+    {"key": "Blood Test", "emoji": "🩸", "label": "Blood Test", "color_slug": "blood"},
+    {"key": "Diabetes", "emoji": "💉", "label": "Diabetes", "color_slug": "diabetes"},
+    {"key": "Orthopedic", "emoji": "🦴", "label": "Orthopedic", "color_slug": "orthopedic"},
+    {"key": "General", "emoji": "📋", "label": "General", "color_slug": "general"},
+]
+VALID_REPORT_CATEGORY_KEYS = {item["key"] for item in REPORT_CATEGORIES}
+
 
 def allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+# MODERN CATEGORY DASHBOARD FEATURE
+def get_latest_upload_label(reports):
+    """Return a friendly label for the most recent report upload in a category."""
+    if not reports:
+        return ""
+
+    latest = max(reports, key=lambda row: row["upload_date"] or "")
+    raw_date = latest["upload_date"]
+    if not raw_date:
+        return "Unknown"
+
+    try:
+        uploaded = datetime.strptime(raw_date, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return raw_date
+
+    days_ago = (datetime.now().date() - uploaded.date()).days
+    if days_ago == 0:
+        return "Today"
+    if days_ago == 1:
+        return "Yesterday"
+    if days_ago < 7:
+        return f"{days_ago} days ago"
+    return uploaded.strftime("%d %b %Y")
+
+
+# REPORT CATEGORIZATION FEATURE
+def group_reports_by_category(reports):
+    """Group report rows by category; only return categories that have reports."""
+    buckets = {}
+    for report in reports:
+        category = (report["category"] or "General").strip()
+        if category not in buckets:
+            buckets[category] = []
+        buckets[category].append(report)
+
+    grouped = []
+    seen = set()
+
+    # Keep a stable order using the predefined category list
+    for cat in REPORT_CATEGORIES:
+        key = cat["key"]
+        if key in buckets and buckets[key]:
+            items = sorted(buckets[key], key=lambda row: row["upload_date"] or "", reverse=True)
+            grouped.append(
+                {
+                    "key": key,
+                    "emoji": cat["emoji"],
+                    "label": cat["label"],
+                    "color_slug": cat["color_slug"],
+                    "reports": items,
+                    "latest_upload_label": get_latest_upload_label(items),
+                }
+            )
+            seen.add(key)
+
+    # Show any unexpected legacy category values (if they exist)
+    for key, items in buckets.items():
+        if key not in seen and items:
+            sorted_items = sorted(items, key=lambda row: row["upload_date"] or "", reverse=True)
+            grouped.append(
+                {
+                    "key": key,
+                    "emoji": "📋",
+                    "label": key,
+                    "color_slug": "general",
+                    "reports": sorted_items,
+                    "latest_upload_label": get_latest_upload_label(sorted_items),
+                }
+            )
+
+    return grouped
 
 
 def get_db_connection():
@@ -70,6 +161,7 @@ def init_db():
                 file_name TEXT NOT NULL,
                 original_filename TEXT,
                 upload_date TEXT NOT NULL,
+                category TEXT,
                 FOREIGN KEY (patient_id) REFERENCES patients (id)
             );
             """
@@ -82,6 +174,13 @@ def init_db():
         report_cols = {row[1] for row in cursor.fetchall()}
         if "original_filename" not in report_cols:
             cursor.execute("ALTER TABLE reports ADD COLUMN original_filename TEXT")
+
+        # REPORT CATEGORIZATION FEATURE — safe column add for existing databases
+        if "category" not in report_cols:
+            cursor.execute("ALTER TABLE reports ADD COLUMN category TEXT")
+            cursor.execute(
+                "UPDATE reports SET category = 'General' WHERE category IS NULL OR TRIM(category) = ''"
+            )
 
         cursor.execute(
             "SELECT id, file_name, original_filename FROM reports WHERE original_filename IS NULL OR TRIM(original_filename) = ''"
@@ -124,17 +223,132 @@ def init_db():
         )
 
 API_KEY = os.getenv("API_KEY")
+
+
+# AI SECURITY & OCR FEATURE
+def redact_sensitive_info(text: str, extra_values=None) -> str:
+    """
+    Mask common patient identifiers before text is sent to the AI model.
+    Uses regex patterns for labels (Name:, Age:, etc.) and standalone PII formats.
+    """
+    if not text:
+        return ""
+
+    cleaned = text
+    extra_values = extra_values or []
+
+    # Label-based redaction (Name: Karthik Kumar → Name: [REDACTED])
+    label_fields = (
+        r"patient\s*name|name|father(?:'?s)?\s*name|father\s*name|"
+        r"mother(?:'?s)?\s*name|guardian\s*name|"
+        r"doctor(?:'?s)?\s*name|physician|referring\s+doctor|consultant|"
+        r"age|gender|sex|address|village|locality|taluk|district|pin\s*code|pincode|"
+        r"phone|mobile|contact|email|e-?mail|aadhaar|aadhar|uid|"
+        r"hospital\s*id|patient\s*id|uhid|mrn|mr\s*no|registration\s*no|reg\.?\s*no|"
+        r"ip\s*no|op\s*no|dob|date\s*of\s*birth|birth\s*date"
+    )
+    label_pattern = re.compile(
+        rf"(?i)\b({label_fields})\s*[:=\-]\s*([^\n\r;|]+)",
+    )
+    cleaned = label_pattern.sub(rf"\1: {REDACTED}", cleaned)
+
+    # Standalone email, phone (India), Aadhaar-style 12-digit groups
+    cleaned = re.sub(
+        r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}",
+        REDACTED,
+        cleaned,
+    )
+    cleaned = re.sub(r"(?:\+91[\-\s]?)?[6-9]\d{9}", REDACTED, cleaned)
+    cleaned = re.sub(r"\b\d{10}\b", REDACTED, cleaned)
+    cleaned = re.sub(r"\b\d{4}[\s\-]?\d{4}[\s\-]?\d{4}\b", REDACTED, cleaned)
+
+    # DOB lines (e.g. DOB: 12/05/1990)
+    cleaned = re.sub(
+        r"(?i)\b(dob|date\s*of\s*birth|birth\s*date)\s*[:=\-]?\s*\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4}",
+        rf"\1: {REDACTED}",
+        cleaned,
+    )
+
+    # Redact known values from the patient record (name, email, etc.)
+    for value in extra_values:
+        if value and len(str(value).strip()) >= 2:
+            cleaned = re.sub(re.escape(str(value).strip()), REDACTED, cleaned, flags=re.IGNORECASE)
+
+    return cleaned
+
+
+# AI SECURITY & OCR FEATURE
+def extract_text_with_ocr(file_path: str) -> str:
+    """OCR fallback for scanned PDFs and image reports when normal extraction is empty."""
+    try:
+        import pytesseract
+        from PIL import Image
+        from pdf2image import convert_from_path
+    except ImportError:
+        return ""
+
+    tesseract_cmd = os.getenv("TESSERACT_CMD")
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+
+    _, ext = os.path.splitext(file_path)
+    ext = ext.lower()
+    parts = []
+
+    try:
+        if ext == ".pdf":
+            poppler_path = os.getenv("POPPLER_PATH")
+            kwargs = {"poppler_path": poppler_path} if poppler_path else {}
+            for page_img in convert_from_path(file_path, **kwargs):
+                parts.append(pytesseract.image_to_string(page_img))
+        elif ext in {".jpg", ".jpeg", ".png"}:
+            with Image.open(file_path) as img:
+                parts.append(pytesseract.image_to_string(img))
+    except Exception as exc:
+        print(f"OCR failed for {file_path}: {exc}")
+        return ""
+
+    return "\n\n".join(p.strip() for p in parts if p and p.strip()).strip()
+
+
 # AI REPORT SUMMARY FEATURE
 def summarize_report(text):
+    # AI SECURITY & OCR FEATURE — only de-identified text goes to Groq
+    safe_text = redact_sensitive_info(text)
+
     client = Groq(api_key=API_KEY)
 
-    prompt = f"Summarize this medical report in simple bullet points for a doctor:\n\n{text}"
+    prompt = f"""You are assisting a doctor reviewing a de-identified medical report.
+
+Format your response with EXACTLY these section headers:
+
+1. Summary
+- Short bullet points of key findings
+
+2. Important Values
+- List important blood/lab values mentioned in the report
+
+3. Abnormal Findings
+- Highlight critical or abnormal values using ⚠️ where appropriate
+
+4. Recommended Follow-Up
+- Suggest follow-up tests or checkups only if clearly implied by the report
+
+5. Overall Health Insight
+- Brief doctor-friendly explanation
+
+Rules:
+- Use simple bullet points only (no long paragraphs)
+- Do NOT invent diagnoses, medications, or advice not supported by the report
+- If a section has no relevant information, write: Not mentioned in report.
+- Keep the response concise and professional
+
+De-identified report text:
+{safe_text}"""
 
     completion = client.chat.completions.create(
         model="llama-3.1-8b-instant",
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
+        messages=[{"role": "user", "content": prompt}],
     )
 
     return completion.choices[0].message.content
@@ -142,9 +356,10 @@ def summarize_report(text):
 
 # AI REPORT SUMMARY FEATURE
 def extract_text_from_report_file(file_path: str) -> str:
-    """Extract text from supported report types (PDF, TXT)."""
+    """Extract text from PDF/TXT first; use OCR only when normal extraction is empty."""
     _, ext = os.path.splitext(file_path)
     ext = ext.lower()
+    text = ""
 
     if ext == ".pdf":
         reader = PdfReader(file_path)
@@ -153,14 +368,17 @@ def extract_text_from_report_file(file_path: str) -> str:
             page_text = page.extract_text() or ""
             if page_text.strip():
                 parts.append(page_text)
-        return "\n\n".join(parts).strip()
+        text = "\n\n".join(parts).strip()
 
-    if ext in {".txt"}:
+    elif ext in {".txt"}:
         with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-            return f.read().strip()
+            text = f.read().strip()
 
-    # Images (jpg/png) are supported uploads, but we don't OCR them here.
-    return ""
+    # AI SECURITY & OCR FEATURE — fallback for scanned PDFs and images
+    if not text.strip():
+        text = extract_text_with_ocr(file_path)
+
+    return text
 
 
 # -----------------
@@ -289,6 +507,12 @@ def create_app():
                 flash("Only PDF, JPG, and PNG files are allowed.", "error")
                 return redirect(url_for("dashboard"))
 
+            # REPORT CATEGORIZATION FEATURE
+            category = request.form.get("report_category", "").strip()
+            if category not in VALID_REPORT_CATEGORY_KEYS:
+                flash("Please select a report category.", "error")
+                return redirect(url_for("dashboard"))
+
             # Store file on disk with a UUID-based filename (keep original separately for display)
             unique_name = f"{uuid.uuid4().hex}_{original_name}"
             save_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_name)
@@ -297,8 +521,11 @@ def create_app():
             upload_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             conn = get_db_connection()
             conn.execute(
-                "INSERT INTO reports (patient_id, file_name, original_filename, upload_date) VALUES (?, ?, ?, ?)",
-                (patient["id"], unique_name, original_name, upload_date),
+                """
+                INSERT INTO reports (patient_id, file_name, original_filename, upload_date, category)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (patient["id"], unique_name, original_name, upload_date, category),
             )
             conn.commit()
             conn.close()
@@ -308,7 +535,12 @@ def create_app():
 
         conn = get_db_connection()
         reports = conn.execute(
-            "SELECT id, file_name, original_filename, upload_date FROM reports WHERE patient_id = ? ORDER BY id DESC",
+            """
+            SELECT id, file_name, original_filename, upload_date, category
+            FROM reports
+            WHERE patient_id = ?
+            ORDER BY id DESC
+            """,
             (patient["id"],),
         ).fetchall()
 
@@ -318,10 +550,15 @@ def create_app():
         ).fetchone()
         conn.close()
 
+        # REPORT CATEGORIZATION FEATURE — only categories with reports are included
+        reports_by_category = group_reports_by_category(reports)
+
         return render_template(
             "dashboard.html",
             patient=patient,
             reports=reports,
+            reports_by_category=reports_by_category,
+            report_categories=REPORT_CATEGORIES,
             latest_key=latest_key,
             qr_code_image=qr_code_image,
         )
@@ -346,11 +583,13 @@ def create_app():
             return redirect(url_for("dashboard"))
 
         # UUID-based random key (short and easy to share)
+       # UUID-based random key (short and easy to share)
         access_key = uuid.uuid4().hex[:12].upper()
-        expiry_time = (datetime.now(ZoneInfo("Asia/Kolkata")) + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
+        expiry_time = (datetime.now() + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
 
-        # Build a QR code that points to the doctor page with this key
-        qr_url = url_for("doctor", key=access_key, _external=True)
+        # Local network QR URL
+        local_ip = "10.196.72.51"   # replace with your system IP
+        qr_url = f"http://{local_ip}:5000/doctor?key={access_key}"
 
         img = qrcode.make(qr_url)
         buffer = BytesIO()
@@ -472,7 +711,12 @@ def create_app():
         """
         conn = get_db_connection()
         report_row = conn.execute(
-            "SELECT id, patient_id, file_name FROM reports WHERE id = ?",
+            """
+            SELECT r.id, r.patient_id, r.file_name, p.name, p.email
+            FROM reports r
+            JOIN patients p ON p.id = r.patient_id
+            WHERE r.id = ?
+            """,
             (report_id,),
         ).fetchone()
 
@@ -502,7 +746,16 @@ def create_app():
 
         text = extract_text_from_report_file(file_path)
         if not text:
-            return jsonify({"error": "Could not extract text from this report type."}), 400
+            return jsonify({
+                "error": "Could not extract text from this report. "
+                "For scanned PDFs or images, install Tesseract OCR and Poppler."
+            }), 400
+
+        # AI SECURITY & OCR FEATURE — extra redaction using known patient fields from DB
+        text = redact_sensitive_info(
+            text,
+            extra_values=[report_row["name"], report_row["email"]],
+        )
 
         try:
             summary = summarize_report(text)
@@ -547,5 +800,4 @@ app = create_app()
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=5000)

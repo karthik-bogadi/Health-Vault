@@ -1926,6 +1926,7 @@
    /* ── Responsive ────────────────────────────────────────────── */
    @media (max-width: 768px) {
      .dashboard-grid  { grid-template-columns: 1fr; }
+   .category-dash-grid { grid-template-columns: 1fr; }
      .feature-grid    { grid-template-columns: 1fr; }
      .emergency-card  { grid-template-columns: 1fr; }
      .hero-card h1    { font-size: 2rem; }
@@ -2430,4 +2431,219 @@ body,
 ::selection {
   background: rgba(37,99,235,0.18);
   color: var(--text-primary);
+}
+
+/* REPORT CATEGORIZATION FEATURE */
+.upload-category-field {
+  text-align: left;
+  margin: 0.85rem 0 0.25rem;
+}
+
+.upload-category-field label {
+  margin-top: 0;
+  margin-bottom: 0.35rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.8rem;
+}
+
+.upload-category-field select {
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+/* MODERN CATEGORY DASHBOARD FEATURE */
+.category-dash-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.category-dash-card {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.95rem 0.9rem 0.85rem;
+  background: white;
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+}
+
+.category-dash-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--blue-500);
+}
+
+.category-dash-card.is-active {
+  border-color: var(--blue-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12), var(--shadow-sm);
+}
+
+.category-dash-card-emoji {
+  font-size: 1.6rem;
+  line-height: 1;
+  margin-bottom: 0.15rem;
+}
+
+.category-dash-card-name {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text-primary);
+}
+
+.category-dash-card-count {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.category-dash-card-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.category-dash-card-chevron {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.7rem;
+  color: var(--text-muted);
+  transition: transform 0.25s ease;
+}
+
+.category-dash-card.is-active .category-dash-card-chevron {
+  transform: rotate(180deg);
+  color: var(--blue-600);
+}
+
+/* MODERN CATEGORY DASHBOARD FEATURE — category accent colors */
+.category-dash-card.cat-heart { background: #fef2f2; }
+.category-dash-card.cat-lungs { background: #eff6ff; }
+.category-dash-card.cat-brain { background: #f5f3ff; }
+.category-dash-card.cat-kidney { background: #ecfdf5; }
+.category-dash-card.cat-liver { background: #fff7ed; }
+.category-dash-card.cat-blood { background: #fdf2f8; }
+.category-dash-card.cat-diabetes { background: #fefce8; }
+.category-dash-card.cat-orthopedic { background: #f8fafc; }
+.category-dash-card.cat-general { background: #f8fafc; }
+
+/* MODERN CATEGORY DASHBOARD FEATURE — full-width report list below card grid */
+.category-dash-details {
+  border-top: 1px solid var(--border);
+  margin-top: 0.25rem;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease, opacity 0.3s ease;
+}
+
+.category-dash-details.is-visible {
+  opacity: 1;
+  max-height: 3000px;
+}
+
+.category-dash-detail {
+  display: none;
+}
+
+.category-dash-detail.is-open {
+  display: block;
+  animation: fadeUp 0.35s ease both;
+}
+
+.category-dash-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.category-dash-details .report-list {
+  width: 100%;
+}
+
+.category-dash-details .report-item {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  width: 100%;
+}
+
+.category-dash-details .report-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.category-dash-details .report-name {
+  display: block;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.category-dash-details .report-actions {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+[data-theme="dark"] .category-dash-card {
+  background: var(--surface-2);
+  border-color: var(--border-2);
+}
+
+[data-theme="dark"] .category-dash-card.cat-heart { background: #3f1d1d; }
+[data-theme="dark"] .category-dash-card.cat-lungs { background: #1e3a5f; }
+[data-theme="dark"] .category-dash-card.cat-brain { background: #2e2459; }
+[data-theme="dark"] .category-dash-card.cat-kidney { background: #134e3a; }
+[data-theme="dark"] .category-dash-card.cat-liver { background: #4a2c0f; }
+[data-theme="dark"] .category-dash-card.cat-blood { background: #4a1942; }
+[data-theme="dark"] .category-dash-card.cat-diabetes { background: #422006; }
+[data-theme="dark"] .category-dash-card.cat-orthopedic,
+[data-theme="dark"] .category-dash-card.cat-general { background: #1e293b; }
+
+[data-theme="dark"] .category-dash-detail-header {
+  background: #0f172a;
+}
+
+[data-theme="dark"] .category-dash-details {
+  border-top-color: var(--border-2);
+}
+
+@media (max-width: 1024px) {
+  .category-dash-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .category-dash-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.upload-card .upload-category-field select {
+  background: white;
+}
+
+[data-theme="dark"] .upload-card .upload-category-field select {
+  background: #0f172a;
 }

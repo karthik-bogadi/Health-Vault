@@ -6,3 +6,5 @@ qrcode
 Pillow
 python-dotenv
 requests
+pytesseract
+pdf2image

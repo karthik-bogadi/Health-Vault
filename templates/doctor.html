@@ -163,12 +163,14 @@
                   View
                 </a>
 
-                {# AI Summary — only for PDFs #}
-                {% if r["file_name"].lower().endswith(".pdf") %}
+                {# AI Summary — PDF, JPG, PNG (OCR fallback for scans) #}
+                {% set fname = r["file_name"].lower() %}
+                {% if fname.endswith(".pdf") or fname.endswith(".jpg") or fname.endswith(".jpeg") or fname.endswith(".png") %}
                   <button
                     type="button"
                     class="ai-summary-btn"
                     data-report-id="{{ r['id'] }}"
+                    data-report-name="{{ r['original_filename'] or r['file_name'] }}"
                   >
                     <!-- icon injected by JS -->
                     AI Summary
@@ -201,8 +203,11 @@
           <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
         </svg>
         AI-Generated Summaries
-        <span class="ai-badge">Powered by AI</span>
+        <span class="ai-badge">De-identified · Powered by AI</span>
       </h3>
+      <p class="muted" style="font-size:0.78rem;margin:-0.5rem 0 0.85rem;line-height:1.5">
+        Patient identifiers are redacted before analysis. Summaries use only report content — not medical advice.
+      </p>
       <div id="aiSummaryContainer"></div>
     </div>
 

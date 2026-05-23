@@ -75,6 +75,17 @@
           <h3>Upload Medical Report</h3>
           <p>PDF, JPG, or PNG · Max 10 MB per file</p>
 
+          <!-- REPORT CATEGORIZATION FEATURE -->
+          <div class="upload-category-field">
+            <label for="report_category">Report Category</label>
+            <select id="report_category" name="report_category" required>
+              <option value="" disabled selected>Select a category</option>
+              {% for cat in report_categories %}
+                <option value="{{ cat['key'] }}">{{ cat['emoji'] }} {{ cat['label'] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
           <div class="file-input-wrapper">
             <span class="file-chosen" id="file-chosen-label">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -112,43 +123,73 @@
           </div>
 
           {% if reports and reports|length > 0 %}
-            <ul class="report-list">
-              {% for r in reports %}
-                <li class="report-item">
-                  <!-- Checkbox -->
-                  <input
-                    type="checkbox"
-                    name="selected_reports"
-                    value="{{ r['id'] }}"
-                    class="report-checkbox"
-                    style="width:16px;height:16px;flex-shrink:0;margin:0"
+            <!-- MODERN CATEGORY DASHBOARD FEATURE — responsive card grid (empty categories hidden) -->
+            <div class="category-dash-grid">
+              {% for group in reports_by_category %}
+                  <button
+                    type="button"
+                    class="category-dash-card cat-{{ group['color_slug'] }}"
+                    data-panel-id="category-panel-{{ loop.index }}"
+                    aria-expanded="false"
                   >
-
-                  <!-- File type icon -->
-                  <div class="report-icon" data-filename="{{ r['original_filename'] or r['file_name'] }}"></div>
-
-                  <!-- Info -->
-                  <div class="report-info">
-                    <div class="report-name">{{ r["original_filename"] or r["file_name"] }}</div>
-                    <div class="report-date">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                      {{ r["upload_date"] }}
-                    </div>
-                  </div>
-
-                  <!-- Actions -->
-                  <div class="report-actions">
-                    <a class="btn btn-ghost btn-sm" href="{{ url_for('uploaded_file', filename=r['file_name']) }}" target="_blank">
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
+                    <span class="category-dash-card-emoji">{{ group['emoji'] }}</span>
+                    <span class="category-dash-card-name">{{ group['label'] }}</span>
+                    <span class="category-dash-card-count">
+                      {{ group['reports']|length }} Report{{ 's' if group['reports']|length != 1 else '' }}
+                    </span>
+                    <span class="category-dash-card-meta">
+                      Last upload: {{ group['latest_upload_label'] or '—' }}
+                    </span>
+                    <span class="category-dash-card-chevron" aria-hidden="true">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="6 9 12 15 18 9"/>
                       </svg>
-                      View
-                    </a>
-                  </div>
-                </li>
+                    </span>
+                  </button>
+
               {% endfor %}
-            </ul>
+            </div>
+
+            <div id="category-dash-details" class="category-dash-details" hidden>
+              {% for group in reports_by_category %}
+                <div id="category-panel-{{ loop.index }}" class="category-dash-detail" hidden>
+                  <div class="category-dash-detail-header">
+                    <span>{{ group['emoji'] }} {{ group['label'] }} Reports</span>
+                    <span class="badge badge-cyan">{{ group['reports']|length }}</span>
+                  </div>
+                  <ul class="report-list">
+                    {% for r in group['reports'] %}
+                      <li class="report-item">
+                        <input
+                          type="checkbox"
+                          name="selected_reports"
+                          value="{{ r['id'] }}"
+                          class="report-checkbox"
+                          style="width:16px;height:16px;flex-shrink:0;margin:0"
+                        >
+                        <div class="report-icon" data-filename="{{ r['original_filename'] or r['file_name'] }}"></div>
+                        <div class="report-info">
+                          <div class="report-name" title="{{ r['original_filename'] or r['file_name'] }}">{{ r["original_filename"] or r["file_name"] }}</div>
+                          <div class="report-date">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            {{ r["upload_date"] }}
+                          </div>
+                        </div>
+                        <div class="report-actions">
+                          <a class="btn btn-ghost btn-sm" href="{{ url_for('uploaded_file', filename=r['file_name']) }}" target="_blank">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                              <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            View
+                          </a>
+                        </div>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endfor %}
+            </div>
           {% else %}
             <div class="empty-state">
               <div class="empty-icon">
@@ -262,4 +303,44 @@
   </div>
 
 </div>
+
+<!-- MODERN CATEGORY DASHBOARD FEATURE — expand/collapse: list shows below all cards -->
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var cards = document.querySelectorAll('.category-dash-card');
+    var detailsWrap = document.getElementById('category-dash-details');
+    if (!cards.length || !detailsWrap) return;
+
+    cards.forEach(function (card) {
+      card.addEventListener('click', function () {
+        var panelId = card.getAttribute('data-panel-id');
+        var panel = document.getElementById(panelId);
+        if (!panel) return;
+
+        var isOpen = panel.classList.contains('is-open');
+
+        document.querySelectorAll('.category-dash-detail').forEach(function (p) {
+          p.classList.remove('is-open');
+          p.hidden = true;
+        });
+        document.querySelectorAll('.category-dash-card').forEach(function (c) {
+          c.classList.remove('is-active');
+          c.setAttribute('aria-expanded', 'false');
+        });
+
+        if (!isOpen) {
+          detailsWrap.hidden = false;
+          detailsWrap.classList.add('is-visible');
+          panel.classList.add('is-open');
+          panel.hidden = false;
+          card.classList.add('is-active');
+          card.setAttribute('aria-expanded', 'true');
+        } else {
+          detailsWrap.classList.remove('is-visible');
+          detailsWrap.hidden = true;
+        }
+      });
+    });
+  });
+</script>
 {% endblock %}
