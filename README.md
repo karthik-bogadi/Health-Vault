@@ -17,13 +17,15 @@ Health Vault is a secure web application that allows patients to **store, manage
 - Upload and manage medical reports  
 - Generate temporary access keys  
 - 🎯 Selective report sharing (choose specific reports)  
-- 📷 QR-based report access sharing  
+- 📷 QR-based report access sharing
+- Segregation of files based on the type(Heart, or Lungs)
 
 ### 🩺 Doctors
 - View patient reports using access keys or QR codes  
 
 ### 🤖 AI Features
-- AI-generated medical report summaries (LLM-based)  
+- AI-generated medical report summaries (LLM-based)
+- Also provide security to the data by hiding the personal information before sending to the LLM(AI)
 
 ---
 
