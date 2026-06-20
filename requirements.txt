@@ -8,3 +8,8 @@ python-dotenv
 requests
 pytesseract
 pdf2image
+
+# ML Dependencies
+pandas
+scikit-learn
+joblib
