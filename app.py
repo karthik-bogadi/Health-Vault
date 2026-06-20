@@ -426,7 +426,7 @@ def persist_report_text_and_summary(conn, report_id: int, save_path: str, patien
 def create_app():
     """Application factory: creates and configures the Flask app."""
     app = Flask(__name__)
-    app.config["SECRET_KEY"] = "dev-secret-key-change-later"
+    app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
     app.config["UPLOAD_FOLDER"] = "uploads"
 
     # Ensure uploads folder exists
@@ -748,8 +748,11 @@ def create_app():
         expiry_time = (datetime.now() + timedelta(minutes=15)).strftime("%Y-%m-%d %H:%M:%S")
 
         # Local network QR URL
-        local_ip = "10.196.72.51"   # replace with your system IP
-        qr_url = f"http://{local_ip}:5000/doctor?key={access_key}"
+        qr_url = url_for(
+            "doctor",
+            key=access_key,
+             _external=True
+        )
 
         img = qrcode.make(qr_url)
         buffer = BytesIO()
