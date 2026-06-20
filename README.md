@@ -193,7 +193,8 @@ health_vault.db
 
 <img width="1503" height="905" alt="pic1" src="https://github.com/user-attachments/assets/c80c2792-ea95-4bc7-8fd1-6e9def211ce1" />
 
-<img width="1231" height="862" alt="pic2" src="https://github.com/user-attachments/assets/cc78fb21-5213-4430-a17c-50695e663f14" />
+<img width="1445" height="887" alt="Screenshot 2026-06-20 194714" src="https://github.com/user-attachments/assets/f56a3fce-a81c-4c18-a4b8-b7442b80abdc" />
+
 
 <img width="1188" height="902" alt="pic3" src="https://github.com/user-attachments/assets/689e90c5-aee7-4ae2-934b-0f411ab963db" />
 
