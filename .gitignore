@@ -1,7 +1,7 @@
 # Virtual Environment
 venv/
-.env/
 .env
+.env/
 .env.example
 # Python cache
 __pycache__/
@@ -13,11 +13,18 @@ __pycache__/
 # Uploads
 uploads/
 
+# ML datasets (large files)
+ml/data/
+
 # OS files
 .DS_Store
 Thumbs.db
 
+# IDE
 .vscode/
+
+# Logs
 *.log
 
+# Temp files
 *.tmp

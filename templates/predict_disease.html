@@ -1,0 +1,239 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-wrapper predict-disease-page">
+
+  <div class="dashboard-header">
+    <div class="dash-welcome">
+      <h2>Predict Disease</h2>
+      <p>Select your symptoms below. The model will suggest the top 3 likely conditions.</p>
+    </div>
+    <div class="predict-disease-header-actions">
+      <a href="{{ url_for('dashboard') }}" class="btn btn-ghost btn-sm" style="width:auto;white-space:nowrap">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"/>
+          <polyline points="12 19 5 12 12 5"/>
+        </svg>
+        Back to Dashboard
+      </a>
+      <a href="{{ url_for('logout') }}" class="btn btn-ghost btn-sm" style="width:auto;white-space:nowrap">Logout</a>
+    </div>
+  </div>
+
+  {% if predictions %}
+  <div class="card card-padded predict-results-card">
+    <div class="section-header">
+      <h3>Top Predictions</h3>
+      <p class="muted">Based on {{ selected_symptoms|length }} selected symptom{{ 's' if selected_symptoms|length != 1 else '' }}</p>
+    </div>
+    <ul class="predict-results-list">
+      {% for disease, confidence in predictions %}
+      <li class="predict-result-item">
+        <div class="predict-result-top">
+          <span class="predict-rank">{{ loop.index }}</span>
+          <span class="predict-disease-name">{{ disease }}</span>
+          <span class="predict-confidence">{{ confidence }}%</span>
+        </div>
+        <div class="predict-confidence-bar" aria-hidden="true">
+          <span style="width: {{ confidence }}%"></span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="predict-disclaimer muted">
+      This is an ML estimate only — not a medical diagnosis. Always consult a doctor.
+    </p>
+    {% if smart_retrieval and smart_retrieval.recommendations %}
+    <div class="smart-retrieval-inline">
+      <a href="{{ url_for('dashboard') }}" class="btn btn-primary btn-sm" style="width:auto;margin-top:0.75rem">
+        Go to Dashboard — Share Recommended Reports
+      </a>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if smart_retrieval and smart_retrieval.recommendations %}
+  <div class="card card-padded smart-retrieval-card">
+    <div class="section-header">
+      <h3>Smart Report Recommendations</h3>
+      <p class="muted">
+        For predicted condition: <strong>{{ smart_retrieval.predicted_disease }}</strong>
+        · {{ smart_retrieval.filtered_count }} of {{ smart_retrieval.total_reports }} reports analyzed locally
+        {% if smart_retrieval.used_groq %} · ranked by AI{% else %} · ranked locally{% endif %}
+      </p>
+    </div>
+    <ul class="smart-retrieval-list">
+      {% for item in smart_retrieval.recommendations %}
+      <li class="smart-retrieval-item">
+        <div class="smart-retrieval-item-top">
+          <span class="predict-rank">{{ loop.index }}</span>
+          <div class="smart-retrieval-item-body">
+            <div class="smart-retrieval-filename">{{ item.filename }}</div>
+            <div class="smart-retrieval-reason">{{ item.reason }}</div>
+          </div>
+          <span class="predict-confidence">{{ item.relevance_score }}%</span>
+        </div>
+        <div class="predict-confidence-bar" aria-hidden="true">
+          <span style="width: {{ item.relevance_score }}%"></span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="predict-disclaimer muted">
+      These reports are pre-selected on your dashboard. You can change the selection before generating an access key.
+    </p>
+  </div>
+  {% endif %}
+
+  <form method="POST" action="{{ url_for('predict_disease') }}" class="predict-disease-form" id="predict-disease-form">
+    <div class="card card-padded">
+      <div class="section-header">
+        <h3>Select Symptoms</h3>
+        <p class="muted">{{ symptoms|length }} symptoms available from the trained model</p>
+      </div>
+
+      {% if model_error %}
+      <div class="predict-model-error">
+        Model files are missing. Run <code>python ml/train_model.py</code> from the project root.
+      </div>
+      {% else %}
+
+      <div class="predict-search-wrap">
+        <label for="symptom-search" class="sr-only">Search symptoms</label>
+        <input
+          type="search"
+          id="symptom-search"
+          class="predict-search-input"
+          placeholder="Search symptoms (e.g. fever, cough, skin rash)..."
+          autocomplete="off"
+        >
+        <span class="predict-selected-count" id="selected-count">0 selected</span>
+      </div>
+
+      <div class="predict-symptom-grid" id="symptom-grid">
+        {% for symptom in symptoms %}
+        <label
+          class="predict-symptom-item"
+          data-label="{{ symptom.label|lower }}"
+          data-search="{{ symptom.label|lower }} {{ symptom.value|lower|replace('_', ' ') }}"
+        >
+          <input
+            type="checkbox"
+            name="symptoms"
+            value="{{ symptom.value }}"
+            {% if symptom.value in selected_symptoms %}checked{% endif %}
+          >
+          <span>{{ symptom.label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      <p class="predict-no-results muted" id="no-results" hidden>No matching symptoms found.</p>
+
+      <div class="predict-form-actions">
+        <button type="button" class="btn btn-ghost btn-sm" id="clear-symptoms" style="width:auto">Clear all</button>
+        <button type="submit" class="btn btn-primary btn-sm" style="width:auto">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+          Predict &amp; Find Reports
+        </button>
+      </div>
+
+      {% endif %}
+    </div>
+  </form>
+
+</div>
+
+{% if not model_error %}
+<script>
+(function () {
+  var searchInput = document.getElementById("symptom-search");
+  var grid = document.getElementById("symptom-grid");
+  var countEl = document.getElementById("selected-count");
+  var noResults = document.getElementById("no-results");
+  var clearBtn = document.getElementById("clear-symptoms");
+  var form = document.getElementById("predict-disease-form");
+  var items = grid ? Array.prototype.slice.call(grid.querySelectorAll(".predict-symptom-item")) : [];
+
+  function normalizeSearchText(text) {
+    return (text || "")
+      .toLowerCase()
+      .replace(/_/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function symptomMatchesQuery(searchText, query) {
+    if (!query) {
+      return true;
+    }
+    if (searchText.indexOf(query) !== -1) {
+      return true;
+    }
+    var tokens = query.split(" ").filter(Boolean);
+    return tokens.length > 0 && tokens.every(function (token) {
+      return searchText.indexOf(token) !== -1;
+    });
+  }
+
+  function updateSelectedCount() {
+    if (!countEl || !grid) return;
+    var checked = grid.querySelectorAll('input[type="checkbox"]:checked').length;
+    countEl.textContent = checked + " selected";
+  }
+
+  function filterSymptoms() {
+    var query = normalizeSearchText(searchInput ? searchInput.value : "");
+    var visible = 0;
+
+    items.forEach(function (item) {
+      var searchText = normalizeSearchText(
+        item.getAttribute("data-search") || item.getAttribute("data-label") || ""
+      );
+      var show = symptomMatchesQuery(searchText, query);
+      item.classList.toggle("is-filter-hidden", !show);
+      if (show) visible += 1;
+    });
+
+    if (noResults) {
+      noResults.hidden = visible > 0 || !query;
+    }
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener("input", filterSymptoms);
+    searchInput.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+      }
+    });
+  }
+
+  if (grid) grid.addEventListener("change", updateSelectedCount);
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", function () {
+      grid.querySelectorAll('input[type="checkbox"]').forEach(function (cb) { cb.checked = false; });
+      updateSelectedCount();
+    });
+  }
+
+  if (form) {
+    form.addEventListener("submit", function (event) {
+      var checked = grid.querySelectorAll('input[type="checkbox"]:checked').length;
+      if (checked === 0) {
+        event.preventDefault();
+        alert("Please select at least one symptom.");
+      }
+    });
+  }
+
+  updateSelectedCount();
+  filterSymptoms();
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -162,6 +162,8 @@ def init_db():
                 original_filename TEXT,
                 upload_date TEXT NOT NULL,
                 category TEXT,
+                extracted_text TEXT,
+                summary TEXT,
                 FOREIGN KEY (patient_id) REFERENCES patients (id)
             );
             """
@@ -181,6 +183,12 @@ def init_db():
             cursor.execute(
                 "UPDATE reports SET category = 'General' WHERE category IS NULL OR TRIM(category) = ''"
             )
+
+        if "extracted_text" not in report_cols:
+            cursor.execute("ALTER TABLE reports ADD COLUMN extracted_text TEXT")
+
+        if "summary" not in report_cols:
+            cursor.execute("ALTER TABLE reports ADD COLUMN summary TEXT")
 
         cursor.execute(
             "SELECT id, file_name, original_filename FROM reports WHERE original_filename IS NULL OR TRIM(original_filename) = ''"
@@ -381,6 +389,36 @@ def extract_text_from_report_file(file_path: str) -> str:
     return text
 
 
+def persist_report_text_and_summary(conn, report_id: int, save_path: str, patient) -> None:
+    """
+    Best-effort post-upload pipeline: extract text, store it, then generate and store summary.
+    Failures are logged; the report row and file on disk are left intact.
+    """
+    try:
+        extracted = extract_text_from_report_file(save_path)
+        if not extracted or not extracted.strip():
+            return
+
+        conn.execute(
+            "UPDATE reports SET extracted_text = ? WHERE id = ?",
+            (extracted, report_id),
+        )
+        conn.commit()
+
+        redacted = redact_sensitive_info(
+            extracted,
+            extra_values=[patient["name"], patient["email"]],
+        )
+        summary = summarize_report(redacted)
+        conn.execute(
+            "UPDATE reports SET summary = ? WHERE id = ?",
+            (summary, report_id),
+        )
+        conn.commit()
+    except Exception as exc:
+        print(f"Report text processing failed for report {report_id}: {exc}")
+
+
 # -----------------
 # App configuration
 # -----------------
@@ -470,6 +508,9 @@ def create_app():
                 flash("Invalid email or password.", "error")
                 return render_template("login.html")
 
+            # Clear any data from a previous session (e.g. smart_retrieval, QR image)
+            # before authenticating the new patient.
+            session.clear()
             session["patient_id"] = patient["id"]
             flash("Login successful.", "success")
             return redirect(url_for("dashboard"))
@@ -520,14 +561,17 @@ def create_app():
 
             upload_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             conn = get_db_connection()
-            conn.execute(
+            insert_cursor = conn.execute(
                 """
                 INSERT INTO reports (patient_id, file_name, original_filename, upload_date, category)
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (patient["id"], unique_name, original_name, upload_date, category),
             )
+            report_id = insert_cursor.lastrowid
             conn.commit()
+
+            persist_report_text_and_summary(conn, report_id, save_path, patient)
             conn.close()
 
             flash("Report uploaded successfully.", "success")
@@ -553,6 +597,26 @@ def create_app():
         # REPORT CATEGORIZATION FEATURE — only categories with reports are included
         reports_by_category = group_reports_by_category(reports)
 
+        smart_retrieval = session.get("smart_retrieval")
+        if smart_retrieval and smart_retrieval.get("patient_id") != patient["id"]:
+            session.pop("smart_retrieval", None)
+            smart_retrieval = None
+
+        recommended_report_ids = []
+        if smart_retrieval and smart_retrieval.get("recommendations"):
+            patient_report_ids = {row["id"] for row in reports}
+            valid_recommendations = [
+                item
+                for item in smart_retrieval["recommendations"]
+                if item.get("report_id") in patient_report_ids
+            ]
+            if not valid_recommendations:
+                session.pop("smart_retrieval", None)
+                smart_retrieval = None
+            else:
+                smart_retrieval = {**smart_retrieval, "recommendations": valid_recommendations}
+                recommended_report_ids = [item["report_id"] for item in valid_recommendations]
+
         return render_template(
             "dashboard.html",
             patient=patient,
@@ -561,6 +625,102 @@ def create_app():
             report_categories=REPORT_CATEGORIES,
             latest_key=latest_key,
             qr_code_image=qr_code_image,
+            smart_retrieval=smart_retrieval,
+            recommended_report_ids=recommended_report_ids,
+        )
+
+    # DISEASE PREDICTION FEATURE — uses ml/service.py (no retraining)
+    @app.route("/predict-disease", methods=["GET", "POST"])
+    def predict_disease():
+        patient = get_current_patient()
+        if not patient:
+            flash("Please log in to continue.", "error")
+            return redirect(url_for("login"))
+
+        from ml.service import (
+            InvalidSymptomsError,
+            ModelNotAvailableError,
+            get_available_symptoms,
+            predict_diseases,
+        )
+
+        symptoms = []
+        predictions = None
+        selected_symptoms = []
+        model_error = None
+
+        try:
+            symptoms = get_available_symptoms()
+        except ModelNotAvailableError as exc:
+            model_error = str(exc)
+            flash(
+                "Disease prediction is unavailable. Model files are missing. "
+                "Run: python ml/train_model.py",
+                "error",
+            )
+
+        if request.method == "POST":
+            if model_error:
+                flash("Cannot run prediction because the model is not available.", "error")
+                return redirect(url_for("predict_disease"))
+
+            selected_symptoms = request.form.getlist("symptoms")
+            try:
+                predictions, warnings = predict_diseases(selected_symptoms, top_k=3)
+                for unknown in warnings:
+                    flash(f"Ignored unknown symptom: {unknown}", "error")
+            except InvalidSymptomsError as exc:
+                flash(str(exc), "error")
+            except ModelNotAvailableError:
+                flash("Model files are missing. Please retrain the model.", "error")
+            except Exception as exc:
+                print(f"Disease prediction error: {exc}")
+                flash("Something went wrong while predicting. Please try again.", "error")
+
+        smart_retrieval = None
+        if predictions:
+            from services.smart_report_retrieval import (
+                NoReportsError,
+                SmartRetrievalError,
+                run_smart_report_retrieval,
+            )
+
+            top_disease = predictions[0][0]
+            try:
+                conn = get_db_connection()
+                smart_retrieval = run_smart_report_retrieval(
+                    conn,
+                    patient["id"],
+                    top_disease,
+                    selected_symptoms,
+                    redact_sensitive_info,
+                    api_key=API_KEY,
+                )
+                conn.close()
+                smart_retrieval["patient_id"] = patient["id"]
+                session["smart_retrieval"] = smart_retrieval
+                if smart_retrieval.get("recommendations"):
+                    flash(
+                        "Smart report recommendations are ready. "
+                        "Review them below or on your dashboard.",
+                        "success",
+                    )
+            except NoReportsError as exc:
+                flash(str(exc), "error")
+            except SmartRetrievalError as exc:
+                flash(str(exc), "error")
+            except Exception as exc:
+                print(f"Smart report retrieval error: {exc}")
+                flash("Could not retrieve report recommendations. Please try again.", "error")
+
+        return render_template(
+            "predict_disease.html",
+            patient=patient,
+            symptoms=symptoms,
+            predictions=predictions,
+            selected_symptoms=selected_symptoms,
+            model_error=model_error,
+            smart_retrieval=smart_retrieval,
         )
 
     @app.route("/generate_key", methods=["POST"])
@@ -616,6 +776,7 @@ def create_app():
         conn.commit()
         conn.close()
 
+        session.pop("smart_retrieval", None)
         flash("Access key generated.", "success")
         return redirect(url_for("dashboard"))
 

@@ -2647,3 +2647,283 @@ body,
 [data-theme="dark"] .upload-card .upload-category-field select {
   background: #0f172a;
 }
+
+/* ── Disease Prediction Page ─────────────────────────────────── */
+.predict-disease-page .dashboard-header {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.predict-disease-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.predict-disease-form {
+  margin-top: 1.25rem;
+}
+
+.predict-search-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.predict-search-input {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.predict-search-input:focus {
+  outline: none;
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.predict-selected-count {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.predict-symptom-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.5rem;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2, var(--surface));
+}
+
+.predict-symptom-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  border: 1px solid transparent;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.predict-symptom-item:hover {
+  background: var(--blue-50);
+  border-color: var(--border);
+}
+
+.predict-symptom-item input {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.predict-symptom-item:has(input:checked) {
+  background: rgba(37, 99, 235, 0.08);
+  border-color: rgba(37, 99, 235, 0.25);
+}
+
+.predict-symptom-item.is-filter-hidden {
+  display: none !important;
+}
+
+.predict-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.predict-results-card {
+  margin-bottom: 1.25rem;
+}
+
+.predict-results-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.predict-result-item {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.predict-result-top {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.5rem;
+}
+
+.predict-rank {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 999px;
+  background: var(--blue-600);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.predict-disease-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.predict-confidence {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--blue-600);
+}
+
+.predict-confidence-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.predict-confidence-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--blue-500), var(--blue-600));
+  border-radius: 999px;
+}
+
+.predict-disclaimer {
+  margin-top: 1rem;
+  font-size: 0.8rem;
+}
+
+.predict-model-error {
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: var(--text-primary);
+  font-size: 0.88rem;
+}
+
+.predict-model-error code {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.82rem;
+}
+
+.predict-no-results {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+[data-theme="dark"] .predict-symptom-item:hover {
+  background: rgba(37, 99, 235, 0.12);
+}
+
+[data-theme="dark"] .predict-symptom-item:has(input:checked) {
+  background: rgba(37, 99, 235, 0.18);
+}
+
+[data-theme="dark"] .predict-search-input {
+  background: #0f172a;
+}
+
+/* ── Smart Medical Report Retrieval ─────────────────────────── */
+.smart-retrieval-banner {
+  margin-bottom: 1.25rem;
+  border-color: rgba(37, 99, 235, 0.25);
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.05), transparent);
+}
+
+.smart-retrieval-card {
+  margin-bottom: 1.25rem;
+}
+
+.smart-retrieval-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.smart-retrieval-list.compact .smart-retrieval-item {
+  padding: 0.65rem 0.75rem;
+}
+
+.smart-retrieval-item {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.smart-retrieval-item-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.smart-retrieval-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.smart-retrieval-filename {
+  font-weight: 600;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.smart-retrieval-reason {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.2rem;
+  line-height: 1.4;
+}
+
+.smart-retrieval-inline {
+  margin-top: 0.5rem;
+}
+
+[data-theme="dark"] .smart-retrieval-banner {
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.12), transparent);
+}

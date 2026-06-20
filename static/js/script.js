@@ -97,7 +97,7 @@
           box.checked = selectAll.checked;
         });
       });
-  
+
       // Update select-all state when individual boxes change
       document.querySelectorAll('.report-checkbox').forEach(function (box) {
         box.addEventListener('change', function () {
@@ -107,6 +107,14 @@
           selectAll.checked = checked.length === all.length;
         });
       });
+
+      // Smart retrieval — sync select-all after server-side pre-selection
+      if (window.HV_RECOMMENDED_REPORT_IDS && window.HV_RECOMMENDED_REPORT_IDS.length) {
+        const all  = document.querySelectorAll('.report-checkbox');
+        const checked = document.querySelectorAll('.report-checkbox:checked');
+        selectAll.indeterminate = checked.length > 0 && checked.length < all.length;
+        selectAll.checked = checked.length === all.length && all.length > 0;
+      }
     }
   
     /* ── Copy access key to clipboard ──────────────────────── */
