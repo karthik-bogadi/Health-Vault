@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-wrapper upload-token-page">
+
+  <div class="auth-card upload-token-card">
+
+    <div class="auth-header">
+      <div class="auth-icon" style="background:linear-gradient(135deg,#0d9488,#14b8a6)">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+      </div>
+      <h2>Upload Report Using Token</h2>
+      <p>Add a medical report to a patient's vault using a temporary upload token</p>
+    </div>
+
+    {% if upload_success %}
+      <div class="upload-token-success">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="9 12 11 14 15 10"/>
+        </svg>
+        <div>
+          <p class="upload-token-success-title">Upload complete</p>
+          <p class="upload-token-success-text">Report successfully added to patient's vault.</p>
+        </div>
+      </div>
+      <div style="margin-top:1.25rem">
+        <a class="btn btn-outline" href="{{ url_for('upload_with_token') }}" style="width:100%;text-align:center;display:inline-flex;justify-content:center;align-items:center;gap:0.5rem">
+          Upload another report
+        </a>
+      </div>
+    {% else %}
+
+      <form method="POST" action="{{ url_for('upload_with_token') }}" enctype="multipart/form-data" id="token-upload-form">
+        <div class="form-group">
+          <label for="upload_token">Upload Token</label>
+          <input
+            id="upload_token"
+            name="upload_token"
+            type="text"
+            placeholder="e.g. HVX-8F9A2K"
+            required
+            autocomplete="off"
+            spellcheck="false"
+            style="font-family:'DM Mono',monospace;letter-spacing:0.06em;text-transform:uppercase"
+            value="{{ form_token or '' }}"
+          >
+        </div>
+
+        <div class="form-group upload-category-field" style="margin-top:0.85rem">
+          <label for="report_category">Report Category</label>
+          <select id="report_category" name="report_category" required>
+            <option value="" disabled {% if not form_category %}selected{% endif %}>Select a category</option>
+            {% for cat in report_categories %}
+              <option value="{{ cat['key'] }}" {% if form_category == cat['key'] %}selected{% endif %}>
+                {{ cat['emoji'] }} {{ cat['label'] }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-top:0.85rem">
+          <label for="report_file">Choose File</label>
+          <div class="file-input-wrapper token-file-input">
+            <span class="file-chosen" id="token-file-chosen-label">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Choose file to upload
+            </span>
+            <input id="report_file" name="report_file" type="file" accept=".pdf,.png,.jpg,.jpeg" required>
+          </div>
+          <p class="muted" style="font-size:0.75rem;margin:0.45rem 0 0">PDF, JPG, or PNG only</p>
+        </div>
+
+        <div style="margin-top:1.5rem">
+          <button type="submit">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/>
+              <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+            </svg>
+            Upload Report
+          </button>
+        </div>
+      </form>
+
+      <div class="upload-token-privacy-note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        <p>You cannot view patient information, reports, or dashboard access with this token.</p>
+      </div>
+
+    {% endif %}
+
+  </div>
+
+  <div class="auth-footer" style="margin-top:1rem">
+    <a class="link" href="{{ url_for('home') }}" style="font-size:0.82rem">&larr; Back to home</a>
+  </div>
+
+</div>
+
+{% if not upload_success %}
+<script>
+  (function () {
+    var input = document.getElementById('report_file');
+    var label = document.getElementById('token-file-chosen-label');
+    if (!input || !label) return;
+    input.addEventListener('change', function () {
+      if (input.files && input.files[0]) {
+        label.textContent = input.files[0].name;
+      }
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}

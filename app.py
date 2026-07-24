@@ -6,7 +6,9 @@ to read and understand for beginners.
 
 import os
 import re
+import secrets
 import sqlite3
+import string
 import uuid
 from datetime import datetime, timedelta
 
@@ -23,8 +25,19 @@ from PyPDF2 import PdfReader
 # AI SECURITY & OCR FEATURE
 REDACTED = "[REDACTED]"
 
+from functools import wraps
+
 from flask import Flask, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
+
+from services.jwt_service import (
+    clear_auth_session,
+    create_token,
+    get_current_user_from_session,
+    store_token_in_session,
+    verify_token,
+)
 
 
 # ----------------------
@@ -47,6 +60,58 @@ REPORT_CATEGORIES = [
     {"key": "General", "emoji": "📋", "label": "General", "color_slug": "general"},
 ]
 VALID_REPORT_CATEGORY_KEYS = {item["key"] for item in REPORT_CATEGORIES}
+
+# UPLOAD TOKEN FEATURE — allowed validity choices when patient shares an upload token
+UPLOAD_TOKEN_VALIDITY_OPTIONS = {
+    "1h": timedelta(hours=1),
+    "24h": timedelta(hours=24),
+    "7d": timedelta(days=7),
+}
+
+
+def generate_upload_token_string() -> str:
+    """Generate a secure upload token like HVX-8F9A2K (prefix + 6 random chars)."""
+    alphabet = string.ascii_uppercase + string.digits
+    suffix = "".join(secrets.choice(alphabet) for _ in range(6))
+    return f"HVX-{suffix}"
+
+
+def normalize_upload_token(raw_token: str) -> str:
+    """Normalize user-entered token for lookup (trim whitespace, uppercase)."""
+    return (raw_token or "").strip().upper()
+
+
+def get_valid_upload_token(conn, token_value: str):
+    """
+    Return an active, non-expired upload_tokens row, or None.
+
+    Public upload route uses this — no patient session is required.
+    """
+    normalized = normalize_upload_token(token_value)
+    if not normalized:
+        return None
+
+    row = conn.execute(
+        """
+        SELECT id, patient_id, token, expires_at, created_at, active
+        FROM upload_tokens
+        WHERE token = ?
+        """,
+        (normalized,),
+    ).fetchone()
+
+    if not row or not row["active"]:
+        return None
+
+    try:
+        expires_at = datetime.strptime(row["expires_at"], "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None
+
+    if expires_at < datetime.now():
+        return None
+
+    return row
 
 
 def allowed_file(filename: str) -> bool:
@@ -190,6 +255,10 @@ def init_db():
         if "summary" not in report_cols:
             cursor.execute("ALTER TABLE reports ADD COLUMN summary TEXT")
 
+        # UPLOAD TOKEN FEATURE — track whether a report was uploaded by patient or token
+        if "uploaded_by" not in report_cols:
+            cursor.execute("ALTER TABLE reports ADD COLUMN uploaded_by TEXT")
+
         cursor.execute(
             "SELECT id, file_name, original_filename FROM reports WHERE original_filename IS NULL OR TRIM(original_filename) = ''"
         )
@@ -229,6 +298,74 @@ def init_db():
             );
             """
         )
+
+        # ------------------------------------------------------------------
+        # JWT ROLE-BASED AUTH — doctors and admins tables
+        # ------------------------------------------------------------------
+        # Doctors log in with email + hashed password, then access the portal.
+        # Admins manage doctor accounts (add / view / delete).
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS doctors (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                license_number TEXT,
+                created_at TEXT NOT NULL
+            );
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admins (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            """
+            )
+
+        # UPLOAD TOKEN FEATURE — temporary tokens let third parties upload to a patient's vault
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS upload_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                patient_id INTEGER NOT NULL,
+                token TEXT UNIQUE NOT NULL,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1,
+                FOREIGN KEY (patient_id) REFERENCES patients (id)
+            );
+            """
+        )
+
+        # Seed a default admin account on first run so you can log in immediately.
+        # Override via ADMIN_EMAIL and ADMIN_PASSWORD in .env for production.
+        admin_count = cursor.execute("SELECT COUNT(*) FROM admins").fetchone()[0]
+        if admin_count == 0:
+            default_admin_email = os.getenv("ADMIN_EMAIL", "admin@healthvault.com").strip().lower()
+            default_admin_password = os.getenv("ADMIN_PASSWORD", "admin123")
+            default_admin_name = os.getenv("ADMIN_NAME", "System Admin")
+            created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute(
+                """
+                INSERT INTO admins (name, email, password_hash, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    default_admin_name,
+                    default_admin_email,
+                    generate_password_hash(default_admin_password),
+                    created_at,
+                ),
+            )
+
+        conn.commit()
 
 API_KEY = os.getenv("API_KEY")
 
@@ -455,6 +592,200 @@ def create_app():
         conn.close()
         return patient
 
+    # ------------------------------------------------------------------
+    # JWT role-based auth helpers (doctor + admin)
+    # ------------------------------------------------------------------
+
+    def require_jwt_role(required_role: str):
+        """
+        Route decorator: allow access only when session holds a valid JWT
+        with the matching role ("doctor" or "admin").
+
+        Example:
+            @app.route("/admin/doctors")
+            @require_jwt_role("admin")
+            def admin_doctors():
+                ...
+        """
+
+        def decorator(view_func):
+            @wraps(view_func)
+            def wrapped_view(*args, **kwargs):
+                user = get_current_user_from_session(session)
+                if not user or user.get("role") != required_role:
+                    flash(f"Please log in as {required_role} to continue.", "error")
+                    if required_role == "admin":
+                        return redirect(url_for("admin_login"))
+                    return redirect(url_for("doctor_login"))
+                return view_func(*args, **kwargs)
+
+            return wrapped_view
+
+        return decorator
+
+    def authenticate_staff(email: str, password: str, table: str):
+        """
+        Look up a doctor or admin by email and verify their password hash.
+
+        Parameters
+        ----------
+        table : str
+            Must be "doctors" or "admins" — only these tables are allowed.
+        """
+        if table not in {"doctors", "admins"}:
+            return None
+
+        conn = get_db_connection()
+        row = conn.execute(
+            f"SELECT id, name, email, password_hash FROM {table} WHERE email = ?",
+            (email.strip().lower(),),
+        ).fetchone()
+        conn.close()
+
+        if not row or not check_password_hash(row["password_hash"], password):
+            return None
+
+        role = "doctor" if table == "doctors" else "admin"
+        return {"id": row["id"], "name": row["name"], "email": row["email"], "role": role}
+
+    # -------------------------
+    # Admin authentication
+    # -------------------------
+
+    @app.route("/admin/login", methods=["GET", "POST"])
+    def admin_login():
+        """Admin login — issues a JWT with role=admin stored in session."""
+        if request.method == "POST":
+            email = request.form.get("email", "").strip().lower()
+            password = request.form.get("password", "").strip()
+
+            if not email or not password:
+                flash("Email and password are required.", "error")
+                return render_template("admin_login.html")
+
+            user = authenticate_staff(email, password, "admins")
+            if not user:
+                flash("Invalid admin email or password.", "error")
+                return render_template("admin_login.html")
+
+            token = create_token(user["id"], user["role"], user["email"], user["name"])
+            store_token_in_session(session, token, user["role"], user["name"])
+            flash("Admin login successful.", "success")
+            return redirect(url_for("admin_doctors"))
+
+        return render_template("admin_login.html")
+
+    @app.route("/admin/logout")
+    def admin_logout():
+        """Clear JWT session keys for admin without affecting patient session."""
+        clear_auth_session(session)
+        flash("Admin logged out.", "success")
+        return redirect(url_for("admin_login"))
+
+    @app.route("/admin/doctors", methods=["GET"])
+    @require_jwt_role("admin")
+    def admin_doctors():
+        """Admin dashboard — list all registered doctors."""
+        conn = get_db_connection()
+        doctors = conn.execute(
+            "SELECT id, name, email, license_number, created_at FROM doctors ORDER BY id DESC"
+        ).fetchall()
+        conn.close()
+        admin_user = get_current_user_from_session(session)
+        return render_template("admin_doctors.html", doctors=doctors, admin_user=admin_user)
+
+    @app.route("/admin/doctors/add", methods=["POST"])
+    @require_jwt_role("admin")
+    def admin_add_doctor():
+        """Admin action — create a new doctor account with hashed password."""
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "").strip()
+        license_number = request.form.get("license_number", "").strip()
+
+        if not name or not email or not password:
+            flash("Name, email, and password are required to add a doctor.", "error")
+            return redirect(url_for("admin_doctors"))
+
+        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        conn = get_db_connection()
+        try:
+            conn.execute(
+                """
+                INSERT INTO doctors (name, email, password_hash, license_number, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (name, email, generate_password_hash(password), license_number or None, created_at),
+            )
+            conn.commit()
+            flash(f"Doctor {name} added successfully.", "success")
+        except sqlite3.IntegrityError:
+            flash("A doctor with this email already exists.", "error")
+        finally:
+            conn.close()
+
+        return redirect(url_for("admin_doctors"))
+
+    @app.route("/admin/doctors/delete/<int:doctor_id>", methods=["POST"])
+    @require_jwt_role("admin")
+    def admin_delete_doctor(doctor_id: int):
+        """Admin action — permanently remove a doctor account."""
+        conn = get_db_connection()
+        doctor = conn.execute("SELECT name FROM doctors WHERE id = ?", (doctor_id,)).fetchone()
+        if not doctor:
+            conn.close()
+            flash("Doctor not found.", "error")
+            return redirect(url_for("admin_doctors"))
+
+        conn.execute("DELETE FROM doctors WHERE id = ?", (doctor_id,))
+        conn.commit()
+        conn.close()
+        flash(f"Doctor {doctor['name']} deleted.", "success")
+        return redirect(url_for("admin_doctors"))
+
+    # -------------------------
+    # Doctor authentication
+    # -------------------------
+
+    @app.route("/doctor/login", methods=["GET", "POST"])
+    def doctor_login():
+        """
+        Doctor login page — after success, JWT is stored in session and
+        the doctor is sent to the portal (/doctor).
+
+        The `next` query param preserves QR deep-links like /doctor?key=ABC123
+        so existing access-key flow continues to work after authentication.
+        """
+        next_url = request.args.get("next") or request.form.get("next") or url_for("doctor")
+
+        if request.method == "POST":
+            email = request.form.get("email", "").strip().lower()
+            password = request.form.get("password", "").strip()
+
+            if not email or not password:
+                flash("Email and password are required.", "error")
+                return render_template("doctor_login.html", next_url=next_url)
+
+            user = authenticate_staff(email, password, "doctors")
+            if not user:
+                flash("Invalid doctor email or password.", "error")
+                return render_template("doctor_login.html", next_url=next_url)
+
+            token = create_token(user["id"], user["role"], user["email"], user["name"])
+            store_token_in_session(session, token, user["role"], user["name"])
+            flash("Doctor login successful.", "success")
+            return redirect(next_url)
+
+        return render_template("doctor_login.html", next_url=next_url)
+
+    @app.route("/doctor/logout")
+    def doctor_logout():
+        """Clear JWT and doctor portal session keys."""
+        clear_auth_session(session)
+        session.pop("doctor_patient_id", None)
+        flash("Doctor logged out.", "success")
+        return redirect(url_for("doctor_login"))
+
     @app.route("/register", methods=["GET", "POST"])
     def register():
         if request.method == "POST":
@@ -592,6 +923,18 @@ def create_app():
             "SELECT access_key, expiry_time FROM access_keys WHERE patient_id = ? ORDER BY id DESC LIMIT 1",
             (patient["id"],),
         ).fetchone()
+
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        latest_upload_token = conn.execute(
+            """
+            SELECT token, expires_at, created_at
+            FROM upload_tokens
+            WHERE patient_id = ? AND active = 1 AND expires_at > ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (patient["id"], now_str),
+        ).fetchone()
         conn.close()
 
         # REPORT CATEGORIZATION FEATURE — only categories with reports are included
@@ -624,6 +967,7 @@ def create_app():
             reports_by_category=reports_by_category,
             report_categories=REPORT_CATEGORIES,
             latest_key=latest_key,
+            latest_upload_token=latest_upload_token,
             qr_code_image=qr_code_image,
             smart_retrieval=smart_retrieval,
             recommended_report_ids=recommended_report_ids,
@@ -783,11 +1127,180 @@ def create_app():
         flash("Access key generated.", "success")
         return redirect(url_for("dashboard"))
 
+    @app.route("/dashboard/share-upload-token", methods=["POST"])
+    def share_upload_token():
+        """Patient-only: create a temporary upload token for third-party report uploads."""
+        patient = get_current_patient()
+        if not patient:
+            flash("Please log in to continue.", "error")
+            return redirect(url_for("login"))
+
+        validity_key = request.form.get("token_validity", "").strip()
+        if validity_key not in UPLOAD_TOKEN_VALIDITY_OPTIONS:
+            flash("Please select a valid token duration.", "error")
+            return redirect(url_for("dashboard"))
+
+        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        expires_at = (
+            datetime.now() + UPLOAD_TOKEN_VALIDITY_OPTIONS[validity_key]
+        ).strftime("%Y-%m-%d %H:%M:%S")
+
+        conn = get_db_connection()
+        token_value = None
+        for _ in range(5):
+            candidate = generate_upload_token_string()
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO upload_tokens (patient_id, token, expires_at, created_at, active)
+                    VALUES (?, ?, ?, ?, 1)
+                    """,
+                    (patient["id"], candidate, expires_at, created_at),
+                )
+                conn.commit()
+                token_value = candidate
+                break
+            except sqlite3.IntegrityError:
+                continue
+        conn.close()
+
+        if not token_value:
+            flash("Could not generate upload token. Please try again.", "error")
+            return redirect(url_for("dashboard"))
+
+        flash(
+            f"Upload token created: {token_value}. Share it with someone who needs to upload a report for you.",
+            "success",
+        )
+        return redirect(url_for("dashboard"))
+
+    @app.route("/upload-with-token", methods=["GET", "POST"])
+    def upload_with_token():
+        """
+        Public upload page — no login required.
+
+        A valid upload token lets a third party add a report to the patient's vault
+        without seeing any patient data or accessing the dashboard.
+        """
+        if request.method == "POST":
+            raw_token = request.form.get("upload_token", "")
+            category = request.form.get("report_category", "").strip()
+
+            conn = get_db_connection()
+            token_row = get_valid_upload_token(conn, raw_token)
+
+            if not token_row:
+                conn.close()
+                flash("Invalid, inactive, or expired upload token.", "error")
+                return render_template(
+                    "upload_with_token.html",
+                    report_categories=REPORT_CATEGORIES,
+                    form_token=normalize_upload_token(raw_token),
+                    form_category=category,
+                )
+
+            if "report_file" not in request.files:
+                conn.close()
+                flash("Please choose a file to upload.", "error")
+                return render_template(
+                    "upload_with_token.html",
+                    report_categories=REPORT_CATEGORIES,
+                    form_token=normalize_upload_token(raw_token),
+                    form_category=category,
+                )
+
+            file = request.files["report_file"]
+            if not file or file.filename == "":
+                conn.close()
+                flash("Please choose a file to upload.", "error")
+                return render_template(
+                    "upload_with_token.html",
+                    report_categories=REPORT_CATEGORIES,
+                    form_token=normalize_upload_token(raw_token),
+                    form_category=category,
+                )
+
+            original_name = secure_filename(file.filename)
+            if not allowed_file(original_name):
+                conn.close()
+                flash("Only PDF, JPG, and PNG files are allowed.", "error")
+                return render_template(
+                    "upload_with_token.html",
+                    report_categories=REPORT_CATEGORIES,
+                    form_token=normalize_upload_token(raw_token),
+                    form_category=category,
+                )
+
+            if category not in VALID_REPORT_CATEGORY_KEYS:
+                conn.close()
+                flash("Please select a report category.", "error")
+                return render_template(
+                    "upload_with_token.html",
+                    report_categories=REPORT_CATEGORIES,
+                    form_token=normalize_upload_token(raw_token),
+                    form_category=category,
+                )
+
+            unique_name = f"{uuid.uuid4().hex}_{original_name}"
+            save_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_name)
+            file.save(save_path)
+
+            upload_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            insert_cursor = conn.execute(
+                """
+                INSERT INTO reports (
+                    patient_id, file_name, original_filename, upload_date, category, uploaded_by
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    token_row["patient_id"],
+                    unique_name,
+                    original_name,
+                    upload_date,
+                    category,
+                    "token",
+                ),
+            )
+            report_id = insert_cursor.lastrowid
+            conn.commit()
+
+            patient = conn.execute(
+                "SELECT * FROM patients WHERE id = ?",
+                (token_row["patient_id"],),
+            ).fetchone()
+            if patient:
+                persist_report_text_and_summary(conn, report_id, save_path, patient)
+            conn.close()
+
+            flash("Report successfully added to patient's vault.", "success")
+            return render_template(
+                "upload_with_token.html",
+                report_categories=REPORT_CATEGORIES,
+                upload_success=True,
+            )
+
+        return render_template("upload_with_token.html", report_categories=REPORT_CATEGORIES)
+
     @app.route("/doctor", methods=["GET", "POST"])
     def doctor():
+        """
+        Doctor portal — JWT-protected entry point to the existing access-key viewer.
+
+        Doctors must log in first (JWT in session). Once authenticated, the
+        access-key form, QR deep-links, report list, and AI summaries work
+        exactly as before.
+        """
+        jwt_user = get_current_user_from_session(session)
+        if not jwt_user or jwt_user.get("role") != "doctor":
+            flash("Please log in as a doctor to access the portal.", "error")
+            # Preserve ?key= query params so QR scans work after login.
+            return redirect(url_for("doctor_login", next=request.full_path.rstrip("?")))
+
         reports = None
         access_key = None
         expiry_time = None                                        # ← ADDED
+        doctor_user = jwt_user
 
         def handle_access_key(raw_key: str):
             nonlocal reports, access_key, expiry_time            # ← ADDED expiry_time
@@ -850,7 +1363,8 @@ def create_app():
                 "doctor.html",
                 reports=reports,
                 access_key=access_key,
-                expiry_time=expiry_time                          # ← ADDED
+                expiry_time=expiry_time,
+                doctor_user=doctor_user,
             )
 
         # QR / direct link: /doctor?key=ACCESSKEY
@@ -861,11 +1375,12 @@ def create_app():
                 "doctor.html",
                 reports=reports,
                 access_key=access_key,
-                expiry_time=expiry_time                          # ← ADDED
+                expiry_time=expiry_time,
+                doctor_user=doctor_user,
             )
 
         # GET request without a key: just show the form
-        return render_template("doctor.html", reports=reports)
+        return render_template("doctor.html", reports=reports, doctor_user=doctor_user)
     # AI REPORT SUMMARY FEATURE
     @app.route("/summarize/<int:report_id>", methods=["GET"])
     def summarize(report_id: int):
@@ -888,14 +1403,21 @@ def create_app():
             conn.close()
             return jsonify({"error": "Report not found."}), 404
 
-        # Only allow summarization if the current session is allowed to see this patient's reports
+        # Only allow summarization if the current session is allowed to see this patient's reports.
+        # Patients: unchanged session check. Doctors: JWT + validated access-key patient id.
         patient = get_current_patient()
         doctor_patient_id = session.get("doctor_patient_id")
+        jwt_user = get_current_user_from_session(session)
 
         allowed = False
         if patient and patient["id"] == report_row["patient_id"]:
             allowed = True
-        if doctor_patient_id and int(doctor_patient_id) == int(report_row["patient_id"]):
+        if (
+            jwt_user
+            and jwt_user.get("role") == "doctor"
+            and doctor_patient_id
+            and int(doctor_patient_id) == int(report_row["patient_id"])
+        ):
             allowed = True
 
         if not allowed:
@@ -933,8 +1455,17 @@ def create_app():
     def uploaded_file(filename):
         patient = get_current_patient()
         doctor_patient_id = session.get("doctor_patient_id")
+        jwt_user = get_current_user_from_session(session)
 
-        if not patient and not doctor_patient_id:
+        # Patient upload viewing — unchanged.
+        # Doctor file viewing — requires valid JWT (logged-in doctor) plus access key session.
+        doctor_allowed = (
+            jwt_user
+            and jwt_user.get("role") == "doctor"
+            and doctor_patient_id
+        )
+
+        if not patient and not doctor_allowed:
             flash("Please log in or use a valid access key.", "error")
             return redirect(url_for("home"))
 

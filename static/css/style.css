@@ -104,9 +104,31 @@
    [data-theme="dark"] .access-form-card,
    [data-theme="dark"] .doctor-reports-card,
    [data-theme="dark"] .ai-summary-card,
-   [data-theme="dark"] .emergency-card {
+   [data-theme="dark"] .emergency-card,
+   [data-theme="dark"] .doctor-account-help {
      background: var(--surface-2);
      border-color: var(--border);
+   }
+
+   [data-theme="dark"] .doctor-account-help-icon {
+     background: #1e3a5f;
+     color: var(--blue-500);
+   }
+
+   [data-theme="dark"] .upload-token-success {
+     background: rgba(16,185,129,0.12);
+     border-color: rgba(16,185,129,0.25);
+     color: #6ee7b7;
+   }
+
+   [data-theme="dark"] .upload-token-success-title {
+     color: #a7f3d0;
+   }
+
+   [data-theme="dark"] .upload-token-validity-field select {
+     background: #0f172a;
+     border-color: var(--border-2);
+     color: var(--text-primary);
    }
    
    /* Dark mode: inputs */
@@ -924,11 +946,183 @@
      background: rgba(255,255,255,0.18);
      transform: translateY(-2px);
    }
+
+   .btn-hero-tertiary {
+     background: rgba(20,184,166,0.15);
+     border: 1.5px solid rgba(45,212,191,0.35);
+     color: #99f6e4;
+     backdrop-filter: blur(8px);
+   }
+
+   .btn-hero-tertiary:hover {
+     background: rgba(20,184,166,0.25);
+     transform: translateY(-2px);
+   }
    
    .feature-grid {
      display: grid;
      grid-template-columns: repeat(3, 1fr);
      gap: 1rem;
+   }
+
+   .feature-column {
+     display: flex;
+     flex-direction: column;
+     gap: 0.75rem;
+   }
+
+   .feature-column .feature-card {
+     flex: 1;
+   }
+
+   /* Doctor account help — login page + home (below Doctor Access Portal) */
+   .doctor-account-help {
+     display: flex;
+     align-items: flex-start;
+     gap: 0.75rem;
+     padding: 0.85rem 1rem;
+     background: white;
+     border: 1px solid var(--border);
+     border-radius: var(--radius-lg);
+     box-shadow: var(--shadow-xs);
+   }
+
+   .doctor-account-help-icon {
+     width: 32px;
+     height: 32px;
+     flex-shrink: 0;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     background: var(--blue-50);
+     border-radius: 8px;
+     color: var(--blue-600);
+   }
+
+   .doctor-account-help-body {
+     min-width: 0;
+   }
+
+   .doctor-account-help-title {
+     font-size: 0.82rem;
+     font-weight: 600;
+     color: var(--text-primary);
+     margin: 0 0 0.15rem;
+     line-height: 1.4;
+   }
+
+   .doctor-account-help-text {
+     font-size: 0.78rem;
+     color: var(--text-secondary);
+     margin: 0 0 0.5rem;
+     line-height: 1.5;
+   }
+
+   .doctor-account-help-label {
+     font-size: 0.72rem;
+     font-weight: 600;
+     text-transform: uppercase;
+     letter-spacing: 0.04em;
+     color: var(--text-muted);
+     margin: 0 0 0.15rem;
+   }
+
+   .doctor-account-help-email {
+     font-size: 0.82rem;
+     font-weight: 500;
+     font-family: 'DM Mono', monospace;
+     color: var(--blue-600);
+     text-decoration: none;
+     word-break: break-all;
+   }
+
+   .doctor-account-help-email:hover {
+     text-decoration: underline;
+   }
+
+   .auth-wrapper .doctor-account-help {
+     max-width: 420px;
+     width: 100%;
+     margin-top: 1rem;
+   }
+
+   /* UPLOAD TOKEN FEATURE — public upload page + dashboard share card */
+   .upload-token-page .auth-card {
+     max-width: 480px;
+   }
+
+   .upload-token-success {
+     display: flex;
+     align-items: flex-start;
+     gap: 0.85rem;
+     padding: 1rem 1.1rem;
+     background: var(--green-50, #ecfdf5);
+     border: 1px solid rgba(16,185,129,0.25);
+     border-radius: var(--radius-md);
+     color: #047857;
+   }
+
+   .upload-token-success-title {
+     font-size: 0.9rem;
+     font-weight: 700;
+     margin: 0 0 0.2rem;
+     color: #065f46;
+   }
+
+   .upload-token-success-text {
+     font-size: 0.84rem;
+     margin: 0;
+     line-height: 1.5;
+   }
+
+   .upload-token-privacy-note {
+     display: flex;
+     align-items: flex-start;
+     gap: 0.65rem;
+     margin-top: 1.25rem;
+     padding: 0.85rem 1rem;
+     background: var(--surface);
+     border: 1px solid var(--border);
+     border-radius: var(--radius-md);
+   }
+
+   .upload-token-privacy-note p {
+     margin: 0;
+     font-size: 0.78rem;
+     color: var(--text-secondary);
+     line-height: 1.5;
+   }
+
+   .upload-token-privacy-note svg {
+     flex-shrink: 0;
+     margin-top: 1px;
+     color: var(--text-muted);
+   }
+
+   .token-file-input {
+     margin-top: 0.35rem;
+   }
+
+   .upload-token-validity-field label {
+     display: block;
+     font-size: 0.78rem;
+     font-weight: 600;
+     color: var(--text-secondary);
+     margin-bottom: 0.35rem;
+   }
+
+   .upload-token-validity-field select {
+     width: 100%;
+     padding: 0.6rem 0.75rem;
+     border: 1px solid var(--border);
+     border-radius: var(--radius-md);
+     font-size: 0.875rem;
+     background: white;
+     color: var(--text-primary);
+   }
+
+   .upload-token-share-card {
+     margin-top: 1rem;
    }
    
    .feature-card {

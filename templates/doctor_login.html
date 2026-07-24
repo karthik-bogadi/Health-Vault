@@ -4,24 +4,24 @@
 <div class="auth-wrapper">
   <div class="auth-card">
 
-    <!-- Header -->
     <div class="auth-header">
-      <div class="auth-icon">
+      <div class="auth-icon" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6)">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
         </svg>
       </div>
-      <h2>Welcome back</h2>
-      <p>Sign in to your patient account</p>
+      <h2>Doctor Login</h2>
+      <p>Sign in to access the patient report portal</p>
     </div>
 
-    <!-- Form -->
-    <form method="POST" action="{{ url_for('login') }}">
+    <form method="POST" action="{{ url_for('doctor_login') }}">
+      {# Preserve redirect target (e.g. /doctor?key=ABC from QR scan) #}
+      <input type="hidden" name="next" value="{{ next_url }}">
 
       <div class="form-group">
-        <label for="email">Email Address</label>
-        <input id="email" name="email" type="email" placeholder="you@example.com" required autocomplete="email">
+        <label for="email">Doctor Email</label>
+        <input id="email" name="email" type="email" placeholder="doctor@hospital.com" required autocomplete="email">
       </div>
 
       <div class="form-group" style="margin-top:0.85rem">
@@ -36,7 +36,7 @@
             <polyline points="10 17 15 12 10 7"/>
             <line x1="15" y1="12" x2="3" y2="12"/>
           </svg>
-          Sign In
+          Sign In as Doctor
         </button>
       </div>
     </form>
@@ -44,16 +44,12 @@
     <div class="form-divider">or</div>
 
     <div class="auth-footer">
-      New patient?&nbsp;<a class="link" href="{{ url_for('register') }}">Create an account &rarr;</a>
+      <span class="muted" style="font-size:0.82rem">Patient account?&nbsp;</span>
+      <a class="link" href="{{ url_for('login') }}" style="font-size:0.82rem">Patient login &rarr;</a>
     </div>
 
   </div>
 
-  <!-- Doctor portal hint -->
-  <div style="text-align:center; margin-top:1.25rem">
-    <span class="muted" style="font-size:0.82rem">Are you a doctor?&nbsp;</span>
-    <a class="link" href="{{ url_for('doctor_login') }}" style="font-size:0.82rem">Doctor login &rarr;</a>
-  </div>
-
+  {% include "partials/doctor_account_help.html" %}
 </div>
 {% endblock %}

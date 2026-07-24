@@ -148,6 +148,21 @@
         });
       });
     }
+
+    const copyUploadTokenBtn = document.getElementById('copy-upload-token-btn');
+    const uploadTokenValueEl = document.getElementById('upload-token-display-value');
+    if (copyUploadTokenBtn && uploadTokenValueEl) {
+      copyUploadTokenBtn.addEventListener('click', function () {
+        const text = uploadTokenValueEl.textContent.trim();
+        navigator.clipboard.writeText(text).then(function () {
+          copyUploadTokenBtn.textContent = '✓ Copied!';
+          setTimeout(function () { copyUploadTokenBtn.textContent = 'Copy'; }, 2000);
+        }).catch(function () {
+          copyUploadTokenBtn.textContent = '✓ Copied!';
+          setTimeout(function () { copyUploadTokenBtn.textContent = 'Copy'; }, 2000);
+        });
+      });
+    }
   
     /* ── Generate key loading state ────────────────────────── */
     const generateKeyForm = document.getElementById('generate-key-form');

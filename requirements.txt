@@ -1,4 +1,5 @@
 Flask
+PyJWT
 gunicorn
 groq
 PyPDF2

@@ -13,6 +13,12 @@
     </div>
     <h2>Patient Report Viewer</h2>
     <p>Enter the patient-issued access key to view their shared medical reports.<br>Access is read-only and time-limited.</p>
+    {% if doctor_user %}
+      <div style="margin-top:0.85rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+        <span class="badge badge-green">Signed in as {{ doctor_user.name }}</span>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('doctor_logout') }}">Log out</a>
+      </div>
+    {% endif %}
   </div>
 
   <!-- ── Access Form Card ───────────────────────────────────── -->

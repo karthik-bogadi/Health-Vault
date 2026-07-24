@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="doctor-wrapper" style="max-width:960px;margin:0 auto">
+
+  <div class="doctor-hero" style="margin-bottom:1.5rem">
+    <div class="doctor-hero-badge">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      Admin Panel
+    </div>
+    <h2>Doctor Management</h2>
+    <p>Logged in as <strong>{{ admin_user.name }}</strong> ({{ admin_user.email }})</p>
+    <div style="margin-top:0.75rem">
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('admin_logout') }}">Log out</a>
+    </div>
+  </div>
+
+  <!-- Add Doctor Form -->
+  <div class="access-form-card" style="margin-bottom:1.5rem">
+    <div class="section-label">Add New Doctor</div>
+    <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem">
+      Create a doctor account. Passwords are stored as secure hashes (never plaintext).
+    </p>
+
+    <form method="POST" action="{{ url_for('admin_add_doctor') }}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem">
+        <div class="form-group">
+          <label for="name">Full Name</label>
+          <input id="name" name="name" type="text" placeholder="Dr. Jane Smith" required>
+        </div>
+        <div class="form-group">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" placeholder="doctor@hospital.com" required>
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" placeholder="Temporary password" required>
+        </div>
+        <div class="form-group">
+          <label for="license_number">License Number (optional)</label>
+          <input id="license_number" name="license_number" type="text" placeholder="MED-12345">
+        </div>
+      </div>
+      <div style="margin-top:1rem">
+        <button type="submit">Add Doctor</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Doctors List -->
+  <div class="doctor-reports-card">
+    <div class="reports-header">
+      <h3>
+        Registered Doctors
+        <span class="badge badge-green" style="margin-left:6px">{{ doctors|length }}</span>
+      </h3>
+    </div>
+
+    {% if doctors|length > 0 %}
+      <ul class="report-list">
+        {% for d in doctors %}
+          <li class="doctor-report-item">
+            <div class="report-icon" data-filename="doctor"></div>
+            <div class="report-info">
+              <div class="report-name">{{ d.name }}</div>
+              <div class="report-date">{{ d.email }}{% if d.license_number %} · {{ d.license_number }}{% endif %}</div>
+              <div class="report-date" style="margin-top:2px">Added {{ d.created_at }}</div>
+            </div>
+            <div class="doctor-report-actions">
+              <form method="POST" action="{{ url_for('admin_delete_doctor', doctor_id=d.id) }}" onsubmit="return confirm('Delete doctor {{ d.name }}?');">
+                <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--red-600,#dc2626)">
+                  Delete
+                </button>
+              </form>
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="empty-state">
+        <h3>No doctors yet</h3>
+        <p>Use the form above to add the first doctor account.</p>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

@@ -305,6 +305,60 @@
         {% endif %}
       </div>
 
+      <!-- Upload Token Card -->
+      <div class="key-card upload-token-share-card">
+        <div class="section-label">Upload Token</div>
+        <h3>Share Upload Token</h3>
+        <p style="font-size:0.82rem;margin-top:0.25rem;margin-bottom:1rem">
+          Let a clinic, lab, or family member upload a report directly to your vault using a temporary token.
+        </p>
+
+        <form method="POST" action="{{ url_for('share_upload_token') }}">
+          <div class="upload-token-validity-field">
+            <label for="token_validity">Token validity</label>
+            <select id="token_validity" name="token_validity" required>
+              <option value="1h">1 Hour</option>
+              <option value="24h" selected>24 Hours</option>
+              <option value="7d">7 Days</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn btn-outline" style="background:white;margin-top:0.85rem;width:100%">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Share Upload Token
+          </button>
+        </form>
+
+        {% if latest_upload_token %}
+          <div class="key-display" style="margin-top:1rem">
+            <div class="key-display-label">Active Upload Token</div>
+            <div class="key-display-value" id="upload-token-display-value">{{ latest_upload_token["token"] }}</div>
+            <div class="key-expiry">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              Expires: {{ latest_upload_token["expires_at"] }}
+            </div>
+            <button class="copy-btn" id="copy-upload-token-btn" type="button" data-copy-target="upload-token-display-value">Copy</button>
+          </div>
+
+          <div style="margin-top:0.85rem;padding:0.75rem;background:var(--cyan-50, #ecfeff);border-radius:8px;border:1px solid rgba(6,182,212,0.25)">
+            <p style="font-size:0.78rem;color:#0e7490;margin:0;display:flex;align-items:flex-start;gap:6px">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Share this token and ask them to upload at <strong>/upload-with-token</strong>. They cannot view your records.
+            </p>
+          </div>
+        {% else %}
+          <div style="margin-top:1rem;padding:1.25rem 1rem;text-align:center;background:var(--surface);border-radius:var(--radius-md);border:1px dashed var(--border-2)">
+            <p class="muted" style="font-size:0.82rem;margin:0">No active upload token.<br>Generate one to allow third-party uploads.</p>
+          </div>
+        {% endif %}
+      </div>
+
       <!-- How it works card -->
       <div style="background:white;border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem">
         <div class="section-label" style="margin-bottom:0.85rem">How It Works</div>
